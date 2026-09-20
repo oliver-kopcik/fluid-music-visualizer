@@ -21,7 +21,7 @@ const fmt = (s) => {
   return `${m}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 };
 
-export function createTransport(container, { player, getMapping, onPreset, onPalette, onAtmosphere, onOpen }) {
+export function createTransport(container, { player, getMapping, onPreset, onPalette, onAtmosphere, onOpen, onExport }) {
   const root = document.createElement('div');
   root.className = 'transport';
   root.innerHTML = `
@@ -48,6 +48,7 @@ export function createTransport(container, { player, getMapping, onPreset, onPal
       <label class="tp-field tp-vol">vol
         <input class="tp-volume" type="range" min="0" max="1" step="0.01" value="1" />
       </label>
+      <button class="tp-btn tp-export" title="Export (E)">export</button>
       <button class="tp-btn tp-open" title="Open another track (O)">open</button>
     </div>`;
   container.appendChild(root);
@@ -82,6 +83,7 @@ export function createTransport(container, { player, getMapping, onPreset, onPal
 
   playBtn.onclick = () => player.toggle();
   $('.tp-open').onclick = () => onOpen?.();
+  $('.tp-export').onclick = () => onExport?.();
   volume.oninput = () => player.setVolume(Number(volume.value));
   presetSel.onchange = () => onPreset?.(presetSel.value);
   paletteSel.onchange = () => onPalette?.(paletteSel.value);

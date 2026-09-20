@@ -19,9 +19,29 @@ npm run dev          # http://localhost:5173
 | M3 · Audio analysis worker + timeline | done |
 | M4 · Playback + FLOW/HITS/FEEL mapping | done |
 | M4b · Arc, atmospheres, test suites | done |
-| M5 · Quick WebM export | |
-| M6 · Deterministic MP4 export | |
+| M5 · Quick realtime recording | done |
+| M6 · Deterministic MP4 render | done |
 | M7 · Transport + preset/palette/atmosphere selectors | done |
+
+## Export
+
+Press `E`, or the **export** button in the transport. Two paths, labelled by what they
+guarantee rather than by format:
+
+**Render** steps the simulation at a fixed rate on its own canvas and GL context, so every
+frame is present and the output is reproducible. Measured at 1080p60: **2.9x faster than
+realtime**, ~168 fps sustained, so a 2.5-minute track takes under a minute. H.264 in MP4
+with AAC audio, streamed to disk through the File System Access API so memory stays flat —
+buffering a 3-minute 1080p60 render would be 89 GB of raw frames.
+
+**Record** captures the live canvas in realtime with sound. Fine for a quick clip; any
+stutter is baked in permanently.
+
+A render is reproducible at the *pixel* level — 240/240 frames identical across two runs
+of the same seed. The encoded MP4 bytes are not identical, because hardware H.264 rate
+control adapts between runs (3,839,812 vs 3,838,265 bytes for the same frames). That is an
+encoder property, so `verifyRenderDeterminism()` hashes frames before encoding rather than
+comparing files.
 
 ## Tests
 
@@ -31,6 +51,8 @@ Both run in the browser console against the dev server:
 await window.synthTest()   // 30 assertions vs synthesised audio with known ground truth
 await window.selfTest()    // end-to-end over the tracks in music/
 await window.checkDeterminism()
+// and, with a track loaded:
+// (await import('/src/export/offlineLoop.js')).verifyRenderDeterminism({ timeline, preset: mapping.preset })
 ```
 
 `synthTest` is the stronger of the two. Real tracks can only be judged; the synthetic

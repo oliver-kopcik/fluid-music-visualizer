@@ -253,6 +253,172 @@
         }
       }
 
+      .exportp {
+        position: fixed;
+        inset: 0;
+        z-index: 12;
+        display: grid;
+        place-items: center;
+        background: rgba(4, 5, 8, 0.72);
+        backdrop-filter: blur(10px);
+      }
+      .exportp.hidden {
+        display: none;
+      }
+      .ep-inner {
+        width: min(560px, calc(100vw - 28px));
+        max-height: calc(100vh - 48px);
+        overflow: auto;
+        background: #0d0f13;
+        border: 1px solid #23262c;
+        border-radius: 16px;
+        padding: 20px;
+        color: #d8dde3;
+        font-size: 13px;
+      }
+      .ep-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 14px;
+      }
+      .ep-head h2 {
+        margin: 0;
+        font-size: 17px;
+        font-weight: 600;
+      }
+      .ep-close {
+        background: none;
+        border: none;
+        color: #8b939d;
+        font-size: 22px;
+        line-height: 1;
+        cursor: pointer;
+        padding: 0 4px;
+      }
+      .ep-card {
+        border: 1px solid #1e2228;
+        border-radius: 11px;
+        padding: 14px;
+        margin-bottom: 12px;
+      }
+      .ep-card h3 {
+        margin: 0 0 6px;
+        font-size: 14px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .ep-tag {
+        font-size: 10px;
+        font-weight: 500;
+        padding: 2px 7px;
+        border-radius: 20px;
+        letter-spacing: 0.02em;
+      }
+      .ep-good {
+        background: #12331f;
+        color: #6ee39a;
+      }
+      .ep-warn {
+        background: #3a2a12;
+        color: #f0b866;
+      }
+      .ep-card p {
+        margin: 0 0 12px;
+        color: #8b939d;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .ep-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 9px;
+        margin-bottom: 12px;
+      }
+      .ep-grid label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 11px;
+        color: #7f8894;
+      }
+      .ep-grid select {
+        background: #14171c;
+        color: #e8ebef;
+        border: 1px solid #2a2f37;
+        border-radius: 7px;
+        padding: 6px;
+        font: inherit;
+        font-size: 12px;
+      }
+      .ep-actions {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+      }
+      .ep-btn {
+        border: 1px solid #2a2f37;
+        background: #14171c;
+        color: #e8ebef;
+        border-radius: 8px;
+        padding: 8px 14px;
+        font: inherit;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .ep-btn:hover:not(:disabled) {
+        background: #1d222a;
+      }
+      .ep-btn:disabled {
+        opacity: 0.4;
+        cursor: default;
+      }
+      .ep-primary {
+        background: #1d4ed8;
+        border-color: #1d4ed8;
+      }
+      .ep-primary:hover:not(:disabled) {
+        background: #2563eb;
+      }
+      .ep-recording {
+        background: #7f1d1d;
+        border-color: #7f1d1d;
+      }
+      .ep-rec-status {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        color: #9aa3ad;
+      }
+      .ep-progress {
+        margin-top: 12px;
+      }
+      .ep-bar {
+        height: 5px;
+        border-radius: 3px;
+        background: #1b1f25;
+        overflow: hidden;
+      }
+      .ep-fill {
+        height: 100%;
+        width: 0;
+        background: #6ea8ff;
+        transition: width 0.2s linear;
+      }
+      .ep-status {
+        margin: 7px 0 0;
+        font-size: 11px;
+        color: #9aa3ad;
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      .ep-note {
+        margin: 0;
+        font-size: 11px;
+        color: #f0b866;
+        line-height: 1.5;
+      }
+
       .keys {
         position: fixed;
         left: 12px;
@@ -268,7 +434,7 @@
   </head>
   <body>
     <canvas></canvas>
-    <div class="keys">space play/pause · D analysis · C clear · drag to splat</div>
+    <div class="keys">space play/pause · D analysis · E export · C clear · drag to splat</div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

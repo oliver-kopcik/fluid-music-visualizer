@@ -6,6 +6,7 @@ import { createSimGUI } from './ui/gui.js';
 import { createTrackPicker } from './ui/trackPicker.js';
 import { createDebugOverlay } from './ui/debugOverlay.js';
 import { createTransport } from './ui/transport.js';
+import { createExportPanel } from './ui/exportPanel.js';
 import { captureScreenshot } from './export/screenshot.js';
 import { makeStreams } from './util/rng.js';
 import { decodeForAnalysis, ANALYSIS_SAMPLE_RATE } from './audio/decode.js';
@@ -24,6 +25,7 @@ let mapping = null;
 let preset = null;
 let trackName = '';
 let presetChoice = 'auto';
+let seed = 0x5eed;
 
 const sim = createFluidSim(canvas, { rng: () => streams.rngSim(), initialSplats: 6 });
 sim.setSize(scaleByPixelRatio(canvas.clientWidth), scaleByPixelRatio(canvas.clientHeight));
@@ -55,10 +57,18 @@ function applyPreset(next, { rebuild = true } = {}) {
   gui.controllers.forEach((c) => c.updateDisplay());
 }
 
+const exportPanel = createExportPanel(document.body, {
+  canvas,
+  player,
+  // Read live, so the panel always exports what is currently on screen.
+  getState: () => ({ timeline, preset, seed, trackName })
+});
+
 const transport = createTransport(document.body, {
   player,
   getMapping: () => mapping,
   onOpen: () => picker.show(),
+  onExport: () => exportPanel.show(),
   onPreset: (name) => {
     presetChoice = name;
     applyPreset(name === 'auto' ? pickPreset(timeline) : PRESETS[name]);
@@ -81,6 +91,7 @@ const picker = createTrackPicker(document.body, {
     timeline = result.timeline;
     trackName = name;
     // Seed from audio content, so the same track always renders the same way.
+    seed = result.seed;
     streams = makeStreams(result.seed);
 
     applyPreset(presetChoice === 'auto' ? pickPreset(timeline) : PRESETS[presetChoice], { rebuild: false });
@@ -119,6 +130,8 @@ window.addEventListener('keydown', (e) => {
   if (e.code === 'KeyD') overlay.toggle();
   if (e.code === 'KeyO') picker.show();
   if (e.code === 'KeyC') sim.clear();
+  if (e.code === 'KeyE') exportPanel.toggle();
+  if (e.code === 'Escape') exportPanel.hide();
   if (e.key === ' ') {
     e.preventDefault();
     if (timeline) player.toggle();
