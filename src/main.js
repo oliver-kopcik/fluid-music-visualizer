@@ -2,6 +2,7 @@ import { createFluidSim } from './fluid/fluidCore.js';
 import { createLoop, scaleByPixelRatio } from './app/loop.js';
 import { attachPointerInput } from './app/pointerInput.js';
 import { createSimGUI } from './ui/gui.js';
+import { renderFrame } from './app/frame.js';
 import { captureScreenshot } from './export/screenshot.js';
 import { makeStreams, hashString } from './util/rng.js';
 
@@ -29,7 +30,14 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-const loop = createLoop(sim, (dt) => sim.frame(dt));
+// Everything that produces a frame goes through renderFrame, live and export alike.
+const frameCtx = { mapping: null, features: null, interactive: true };
+let elapsed = 0;
+
+const loop = createLoop(sim, (dt) => {
+  elapsed += dt;
+  renderFrame(sim, frameCtx, elapsed, dt);
+});
 
 // The sunrays dithering texture loads async. Starting before it lands would mean the first
 // frames use the 1x1 placeholder — harmless live, but it would make two exports differ.
@@ -37,3 +45,13 @@ sim.ready.then(() => loop.start());
 
 // Handy while developing.
 window.sim = sim;
+
+// Dev-only: `await window.checkDeterminism()` in the console.
+if (import.meta.env.DEV) {
+  window.checkDeterminism = async (opts) => {
+    const m = await import('./dev/determinism.js');
+    const result = await m.checkDeterminism(opts);
+    console.log(m.formatResult(result));
+    return result;
+  };
+}

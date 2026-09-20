@@ -887,6 +887,7 @@ export function createFluidSim (canvas, options = {}) {
     }
 
     function splat (x, y, dx, dy, color) {
+        if (options.onSplat) options.onSplat(x, y, dx, dy, color);
         splatProgram.bind();
         gl.uniform1i(splatProgram.uniforms.uTarget, velocity.read.attach(0));
         gl.uniform1f(splatProgram.uniforms.aspectRatio, canvas.width / canvas.height);

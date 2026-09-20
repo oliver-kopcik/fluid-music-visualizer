@@ -134,6 +134,16 @@ const ops = [
     ]
   },
   {
+    from: 1441,
+    to: 1441,
+    note: 'instrumentation hook: lets the determinism harness see every splat, including the '
+      + 'ones multipleSplats/splatPointer raise internally rather than through the public API',
+    replace: [
+      'function splat (x, y, dx, dy, color) {',
+      '    if (options.onSplat) options.onSplat(x, y, dx, dy, color);'
+    ]
+  },
+  {
     from: 1464,
     to: 1524,
     note: 'DOM listeners move to src/app/pointerInput.js; export never attaches them',
