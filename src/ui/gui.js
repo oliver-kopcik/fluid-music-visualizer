@@ -8,7 +8,7 @@
  */
 import GUI from 'lil-gui';
 
-export function createSimGUI(sim, { onScreenshot } = {}) {
+export function createSimGUI(sim, { onScreenshot, getMapping } = {}) {
   const gui = new GUI({ width: 300, title: 'Simulation' });
   const set = (key) => (value) => sim.setConfig({ [key]: value });
 
@@ -41,6 +41,17 @@ export function createSimGUI(sim, { onScreenshot } = {}) {
   capture.addColor(sim.config, 'BACK_COLOR').name('background color');
   capture.add(sim.config, 'TRANSPARENT').name('transparent');
   if (onScreenshot) capture.add({ shot: onScreenshot }, 'shot').name('take screenshot');
+
+  if (getMapping) {
+    const sync = { offset: 0.045 };
+    gui
+      .add(sync, 'offset', -0.25, 0.25, 0.005)
+      .name('a/v sync (s)')
+      .onChange((v) => {
+        const m = getMapping();
+        if (m) m.syncOffset = v;
+      });
+  }
 
   gui.close();
   return gui;

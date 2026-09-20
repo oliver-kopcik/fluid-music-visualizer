@@ -26,7 +26,10 @@ const sim = createFluidSim(canvas, { rng: () => streams.rngSim(), initialSplats:
 sim.setSize(scaleByPixelRatio(canvas.clientWidth), scaleByPixelRatio(canvas.clientHeight));
 
 attachPointerInput(sim);
-const gui = createSimGUI(sim, { onScreenshot: () => captureScreenshot(sim) });
+const gui = createSimGUI(sim, {
+  onScreenshot: () => captureScreenshot(sim),
+  getMapping: () => mapping
+});
 
 const frameCtx = { mapping: null, features: { live: null }, interactive: true };
 let lastTime = 0;

@@ -12,13 +12,13 @@
 import { OnePole, Envelope, lerp, clamp01 } from './smoothers.js';
 
 export function createFeel(config) {
-  const curl = new OnePole(0.15, 30);
-  const radius = new OnePole(0.15, 0.25);
+  const curl = new OnePole(0.07, 30);
+  const radius = new OnePole(0.06, 0.25);
   const density = new OnePole(0.15, 1);
   const velocity = new OnePole(0.15, 0.2);
-  const pressure = new OnePole(0.15, 0.8);
+  const pressure = new OnePole(0.08, 0.8);
   const bloom = new Envelope(0.02, 0.18, 0.8);
-  const sunrays = new OnePole(0.15, 1);
+  const sunrays = new OnePole(0.12, 1);
 
   const patch = {};
 

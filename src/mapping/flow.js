@@ -20,7 +20,7 @@ import { clamp, clamp01 } from './smoothers.js';
 
 const REFERENCE_DT = 1 / 60;
 
-const BANDS_FULL = ['bassSlow', 'bassSlow', 'mid', 'mid', 'trebleFast', 'trebleFast'];
+const BANDS_FULL = ['bassDrive', 'bassDrive', 'mid', 'mid', 'trebleFast', 'trebleFast'];
 // Nothing in the low end to drive the first emitters, so shift everything up a band.
 const BANDS_SPARSE = ['mid', 'mid', 'mid', 'centroidEnergy', 'trebleFast', 'trebleFast'];
 
