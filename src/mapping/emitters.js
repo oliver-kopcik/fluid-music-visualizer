@@ -47,7 +47,9 @@ export function createEmitterSystem(count, rng) {
       vy: 0,
       prevX: 0.5,
       prevY: 0.5,
-      energy: 0
+      energy: 0,
+      /** This emitter's own smoothed level, from its own slice of the spectrum. */
+      level: 0
     });
   }
 
@@ -61,6 +63,7 @@ export function createEmitterSystem(count, rng) {
       e.vx = 0;
       e.vy = 0;
       e.energy = 0;
+      e.level = 0;
     }
   }
 

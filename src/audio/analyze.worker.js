@@ -125,6 +125,36 @@ function analyze(samples, sampleRate, name, onProgress) {
   const rmsNorm = normalizeRobust(rms).out;
   normalizeSpectrum(spectrum32);
 
+  /**
+   * How loud this track typically gets at each point across the spectrum.
+   *
+   * The spectrum is scaled by a single global maximum, which is right for comparing one
+   * frequency against another — onset pitch depends on exactly that — but it leaves whole
+   * stretches of the range permanently faint. The axis is log-spaced, so the bottom of it
+   * covers 40-65Hz where an FFT has almost no resolution, and a reader positioned there
+   * measured 0.025 against a gate of 0.06: the bass emitter could never switch on however
+   * loud the bass was.
+   *
+   * Dividing by this reference gives every frequency its own usable range. It is smoothed
+   * because loudness varies slowly with frequency and a bumpy reference would print its
+   * own bumps onto the picture, and floored against the track's overall level so a range
+   * with genuinely nothing in it — the bottom of a drumless stem — stays quiet instead of
+   * having its noise amplified to fill the gap.
+   */
+  const spectrumReference = new Float32Array(SPECTRUM_BINS);
+  {
+    const column = new Float32Array(n);
+    for (let b = 0; b < SPECTRUM_BINS; b++) {
+      for (let f = 0; f < n; f++) column[f] = spectrum32[f * SPECTRUM_BINS + b];
+      spectrumReference[b] = percentile(column, 95);
+    }
+    for (let pass = 0; pass < 3; pass++) smooth3InPlace(spectrumReference);
+    let loudest = 0;
+    for (let b = 0; b < SPECTRUM_BINS; b++) loudest = Math.max(loudest, spectrumReference[b]);
+    const quietest = 0.12 * loudest;
+    for (let b = 0; b < SPECTRUM_BINS; b++) spectrumReference[b] = Math.max(spectrumReference[b], quietest);
+  }
+
   // Flux is scaled, never clamped — see scaleByP95. Detection runs on these, so the peaks
   // must keep their relative heights.
   const fluxNorm = scaleByP95(flux).out;
@@ -305,6 +335,7 @@ function analyze(samples, sampleRate, name, onProgress) {
     thresholdFull: full.threshold,
     sustain,
     spectrum32,
+    spectrumReference,
     beats: tempo.beats,
     downbeats: tempo.downbeats,
     onsetTimes: Float32Array.from(onsets, (o) => o.t),

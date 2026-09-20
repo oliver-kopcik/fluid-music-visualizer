@@ -38,11 +38,24 @@ export class Timeline {
   }
 
   /** 32 log-spaced magnitudes for the frame nearest `t`, written into `out`. */
+  /**
+   * The spectrum at `t`, scaled so every frequency has usable range.
+   *
+   * The stored curve is scaled by one global maximum, which is what onset pitch needs —
+   * it compares one frequency against another. Anything reading a single frequency over
+   * time needs the opposite, or a range the track never reaches loudly stays dark forever.
+   * Headroom is left above 1 for the same reason normalizeRobust does: peaks should punch
+   * through rather than clip flat.
+   */
   spectrumAt(t, out) {
     const bins = 32;
     const i = Math.min(this.numFrames - 1, Math.max(0, Math.round(t * this.frameRate)));
     const base = i * bins;
-    for (let b = 0; b < bins; b++) out[b] = this.spectrum32[base + b];
+    const reference = this.spectrumReference;
+    for (let b = 0; b < bins; b++) {
+      const v = this.spectrum32[base + b];
+      out[b] = reference ? Math.min(1.6, v / Math.max(1e-6, reference[b])) : v;
+    }
     return out;
   }
 

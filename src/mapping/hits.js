@@ -85,6 +85,7 @@ export function createHits(config, rng, system) {
       const result = emitOnset(sim, {
         pitch,
         noise: onset.noise ?? 0.5,
+        decay: onset.decay ?? 0,
         strength: s,
         palette,
         arc,
@@ -137,6 +138,7 @@ export function createHits(config, rng, system) {
         emitOnset(sim, {
           pitch: ring.pitch,
           noise: ring.noise,
+          decay: ring.decay,
           strength: ring.strength,
           palette,
           arc,

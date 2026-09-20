@@ -251,13 +251,23 @@ export async function synthTest({ verbose = true } = {}) {
      * mapping fails this at every boundary.
      */
     let biggestJump = 0;
-    let prev = shapeOf(0, 0.5);
+    let prev = shapeOf(0, 0.5, 0.4);
     for (let i = 1; i <= 200; i++) {
-      const cur = shapeOf(i / 200, 0.5);
+      const cur = shapeOf(i / 200, 0.5, 0.4);
       biggestJump = Math.max(biggestJump, Math.hypot(cur.x - prev.x, cur.y - prev.y));
       prev = cur;
     }
     check('pitch: the mapping is continuous', biggestJump < 0.02, `largest step ${biggestJump.toFixed(4)}`);
+
+    /** The other position axis has to be smooth too, or the frame has a seam in it. */
+    let sustainJump = 0;
+    let prevS = shapeOf(0.5, 0.5, 0);
+    for (let i = 1; i <= 200; i++) {
+      const cur = shapeOf(0.5, 0.5, i / 200);
+      sustainJump = Math.max(sustainJump, Math.hypot(cur.x - prevS.x, cur.y - prevS.y));
+      prevS = cur;
+    }
+    check('pitch: the sustain axis is continuous', sustainJump < 0.05, `largest step ${sustainJump.toFixed(4)}`);
   }
 
   /**
@@ -270,7 +280,7 @@ export async function synthTest({ verbose = true } = {}) {
   {
     const sig = synth.hatPair({ bpm: 120, bars: 8 });
     const tl = await analyse(sig.mono, 'synth-envelope');
-    const { ringSecondsFor } = await import('../mapping/gesture.js');
+    const { ringSecondsFor, shapeOf } = await import('../mapping/gesture.js');
 
     const near = (times, field, tol = 0.06) => {
       const out = [];
@@ -299,6 +309,18 @@ export async function synthTest({ verbose = true } = {}) {
       'envelope: the pair is not separable by pitch',
       Math.abs(openPitch - closedPitch) < 0.3,
       `closed ${closedPitch.toFixed(2)} vs open ${openPitch.toFixed(2)}`
+    );
+    /**
+     * Position is the other half of telling them apart: same pitch means the same height,
+     * so if sustain did not move them across the frame they would sit on top of each
+     * other and only the tail would distinguish them.
+     */
+    const closedShape = shapeOf(closedPitch, 0.5, closedDecay);
+    const openShape = shapeOf(openPitch, 0.5, openDecay);
+    check(
+      'envelope: the pair is drawn in different places',
+      Math.abs(openShape.x - closedShape.x) > 0.25,
+      `closed x=${closedShape.x.toFixed(2)} vs open x=${openShape.x.toFixed(2)}`
     );
     check(
       'envelope: only the open hat is drawn ringing',

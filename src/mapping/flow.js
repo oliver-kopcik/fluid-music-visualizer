@@ -18,9 +18,41 @@ import { clamp, clamp01 } from './smoothers.js';
 
 const REFERENCE_DT = 1 / 60;
 
-const BANDS_FULL = ['bassDrive', 'bassDrive', 'mid', 'mid', 'trebleFast', 'trebleFast'];
-// Nothing in the low end to drive the first emitters, so shift everything up a band.
-const BANDS_SPARSE = ['mid', 'mid', 'mid', 'centroidEnergy', 'trebleFast', 'trebleFast'];
+/**
+ * Read the spectrum as a curve, not as a set of bins.
+ *
+ * The FFT hands back 32 numbers, but nothing downstream should ever be assigned "bins 5
+ * to 10" — that is a bucket, and buckets are what this whole mapping exists to avoid. An
+ * emitter sits at a real-valued position on the frequency axis and reads the curve around
+ * it with a smooth weighting, so moving an emitter a hair changes its level a hair, and
+ * two neighbouring emitters overlap rather than meeting at an edge.
+ *
+ * The axis is log-spaced from 40Hz to 16kHz, the same one onset pitch is measured on, so
+ * an emitter's position and a hit's height mean the same thing.
+ */
+const READ_WIDTH = 2.2;
+
+function sampleCurve(values, position) {
+  const n = values.length;
+  const centre = clamp01(position) * (n - 1);
+  const from = Math.max(0, Math.floor(centre - READ_WIDTH * 2));
+  const to = Math.min(n - 1, Math.ceil(centre + READ_WIDTH * 2));
+  let sum = 0;
+  let weight = 0;
+  for (let b = from; b <= to; b++) {
+    const d = (b - centre) / READ_WIDTH;
+    const w = Math.exp(-0.5 * d * d);
+    sum += values[b] * w;
+    weight += w;
+  }
+  return weight > 0 ? sum / weight : 0;
+}
+
+/**
+ * Low frequencies respond slowly and high ones quickly, which is the difference between
+ * body and shimmer. Carried over from the bassSlow/trebleFast pairing the named bands had.
+ */
+const tauFor = (position) => 0.22 - 0.19 * position;
 
 export function createFlow(config, rng, system) {
   let emitAccumulator = 0;
@@ -38,7 +70,6 @@ export function createFlow(config, rng, system) {
     emitAccumulator -= rounds * REFERENCE_DT;
 
     const aspect = sim.canvas.width / sim.canvas.height;
-    const bands = f.profile === 'sparse' ? BANDS_SPARSE : BANDS_FULL;
     const force = config.force ?? 220;
     const gate = config.gate ?? 0.06;
     // Higher-dissipation atmospheres deposit more, or they would simply be darker rather
@@ -56,11 +87,11 @@ export function createFlow(config, rng, system) {
      */
     for (let r = 0; r < rounds; r++) {
       system.step(arc.formation, aspect, REFERENCE_DT, swirl);
-      emitRound(sim, f, palette, arc, aspect, bands, force, gate, dyeScale);
+      emitRound(sim, f, palette, arc, aspect, force, gate, dyeScale);
     }
   }
 
-  function emitRound(sim, f, palette, arc, aspect, bands, force, gate, dyeScale) {
+  function emitRound(sim, f, palette, arc, aspect, force, gate, dyeScale) {
 
     /**
      * Every emitter emits on every round, always.
@@ -78,14 +109,17 @@ export function createFlow(config, rng, system) {
     for (let i = 0; i < system.emitters.length; i++) {
       const e = system.emitters[i];
 
-      const band = bands[i % bands.length];
-      const raw = band === 'centroidEnergy' ? f.centroid * f.rms : f[band];
+      // Where this emitter sits on the frequency axis, and what the curve reads there.
+      // Spread across the whole range, so no two emitters share a value.
+      const position = (i + 0.5) / system.emitters.length;
+      const raw = sampleCurve(f.spectrum, position);
+      e.level += (raw - e.level) * (1 - Math.exp(-REFERENCE_DT / tauFor(position)));
 
       // A held note keeps pushing even when nothing is attacking — without this a
       // drumless track goes still between phrases. e.energy carries recent hits, so an
       // emitter that was just struck keeps glowing for a moment.
       const level =
-        Math.max(0, raw - gate) + (config.sustainDrive ?? 0.6) * f.sustain + e.energy * 0.5;
+        Math.max(0, e.level - gate) + (config.sustainDrive ?? 0.6) * f.sustain + e.energy * 0.5;
       const drive = floor + level * (0.35 + 0.65 * arc.intensity);
 
       // Direction of travel, not a formula. This is what ties the dye to the physics.
@@ -116,7 +150,9 @@ export function createFlow(config, rng, system) {
       // without pause, so each has to be far fainter than a mouse splat or the screen
       // fills within a couple of seconds.
       const dye = (0.006 + 0.05 * Math.pow(clamp01(drive), 0.8)) * (0.35 + 0.9 * arc.intensity) * dyeScale;
-      palette.colorAt(clamp01(f.centroid + i * 0.03), dye, color, arc.hueOffset);
+      // Colour from this emitter's own frequency, not the track's global centroid: with a
+      // shared centroid all six came out the same hue whatever they were each carrying.
+      palette.colorAt(position, dye, color, arc.hueOffset);
 
       sim.splat(e.x, e.y, rx * mag, ry * mag, color);
     }
