@@ -218,6 +218,31 @@ function analyze(samples, sampleRate, name, onProgress) {
   const tempo = estimateTempo(fluxNorm);
 
   /**
+   * How big a rise this track calls a strong one.
+   *
+   * The picture is drawn from how much each frequency rose since a fixed moment earlier,
+   * and that quantity has no natural scale: a compressed master and a quiet acoustic take
+   * differ by an order of magnitude in it. Without this the force constants would be tuned
+   * against whichever track happened to be open — an absolute threshold on a relative
+   * quantity, which is the mistake that has cost the most in this codebase. Dividing by the
+   * track's own strong rise means a hard transient reads as about 1 whatever the material.
+   */
+  let riseReference = 1;
+  {
+    const step = Math.max(1, Math.round(FRAME_RATE / 60));
+    const rises = new Float32Array(Math.max(1, (n - step) * SPECTRUM_BINS));
+    let count = 0;
+    for (let f = step; f < n; f++) {
+      for (let b = 0; b < SPECTRUM_BINS; b++) {
+        const gain = 1 / Math.max(1e-6, spectrumReference[b]);
+        const d = spectrum32[f * SPECTRUM_BINS + b] * gain - spectrum32[(f - step) * SPECTRUM_BINS + b] * gain;
+        if (d > 0) rises[count++] = d;
+      }
+    }
+    riseReference = count ? Math.max(1e-3, percentile(rises.subarray(0, count), 97)) : 1;
+  }
+
+  /**
    * The continuous numbers the visuals are built from: where the sound sits in the
    * spectrum, how noisy it is, and how long it rings — alongside the strength the detector
    * already reports. Everything about how a hit is drawn varies smoothly with these, so
@@ -336,6 +361,7 @@ function analyze(samples, sampleRate, name, onProgress) {
     sustain,
     spectrum32,
     spectrumReference,
+    riseReference,
     beats: tempo.beats,
     downbeats: tempo.downbeats,
     onsetTimes: Float32Array.from(onsets, (o) => o.t),

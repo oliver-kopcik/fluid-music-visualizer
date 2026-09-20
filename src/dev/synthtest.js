@@ -280,7 +280,7 @@ export async function synthTest({ verbose = true } = {}) {
   {
     const sig = synth.hatPair({ bpm: 120, bars: 8 });
     const tl = await analyse(sig.mono, 'synth-envelope');
-    const { ringSecondsFor, shapeOf } = await import('../mapping/gesture.js');
+    const { shapeOf } = await import('../mapping/gesture.js');
 
     const near = (times, field, tol = 0.06) => {
       const out = [];
@@ -322,17 +322,6 @@ export async function synthTest({ verbose = true } = {}) {
       Math.abs(openShape.x - closedShape.x) > 0.25,
       `closed x=${closedShape.x.toFixed(2)} vs open x=${openShape.x.toFixed(2)}`
     );
-    check(
-      'envelope: only the open hat is drawn ringing',
-      ringSecondsFor(closedDecay) === 0 && ringSecondsFor(openDecay) > 0.1,
-      `closed ${ringSecondsFor(closedDecay).toFixed(2)}s vs open ${ringSecondsFor(openDecay).toFixed(2)}s`
-    );
-    /** Ring length has to vary smoothly too, or it is a bucket wearing a disguise. */
-    let biggestJump = 0;
-    for (let i = 1; i <= 200; i++) {
-      biggestJump = Math.max(biggestJump, Math.abs(ringSecondsFor(i / 200) - ringSecondsFor((i - 1) / 200)));
-    }
-    check('envelope: ring length is continuous', biggestJump < 0.05, `largest step ${biggestJump.toFixed(3)}s`);
   }
 
   // ---- 3. sweep: the centroid should track a known curve ------------------------------

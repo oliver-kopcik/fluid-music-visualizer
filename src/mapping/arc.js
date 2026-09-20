@@ -11,7 +11,6 @@
  * little dye, a nearly dark screen — which is what makes the loud parts land.
  */
 import { OnePole, Envelope, clamp01, lerp } from './smoothers.js';
-import { blendFormations } from './emitters.js';
 import { blendAtmospheres, ATMOSPHERE_NAMES } from './atmospheres.js';
 
 export const POSTURES = ['drift', 'ring', 'coil', 'burst'];
@@ -30,7 +29,6 @@ export function createArc(atmosphereIndex) {
   const sectionHue = new OnePole(1.2, 0.5);
 
   const weights = { drift: 0, ring: 0, coil: 0, burst: 0 };
-  const formation = {};
   const atmosphere = {};
 
   /** When set, overrides the per-section choice so one atmosphere can be auditioned. */
@@ -60,7 +58,6 @@ export function createArc(atmosphereIndex) {
   const state = {
     posture: 'ring',
     weights,
-    formation,
     /** 0..1 overall level of activity — the dynamic-range control. */
     intensity: 0.5,
     /** 0..1, how coiled. Drives curl and inward pull. */
@@ -140,7 +137,6 @@ export function createArc(atmosphereIndex) {
     weights.ring = rawRing;
     weights.coil = rawCoil;
     weights.burst = rawBurst;
-    blendFormations(weights, formation);
 
     state.coil = rawCoil;
     state.burst = rawBurst;

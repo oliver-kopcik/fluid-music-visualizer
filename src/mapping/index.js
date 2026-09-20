@@ -5,28 +5,26 @@
  * bursting out of it, or resting — and how much output this moment deserves. Everything
  * downstream reads that, which is what stops a drop from being merely a louder verse.
  *
- * Then FEEL (so the splat radius and dissipation this frame's splats land into are right),
- * then HITS (which shove the emitters and may bump the radius further), then FLOW.
+ * Then FEEL, so the splat radius and dissipation this frame's splats land into are right,
+ * then FIELD, which is now the only thing that draws: it renders whatever rose in the
+ * spectrum since a fixed moment ago. HITS and FLOW are gone — see field.js for why one
+ * measurement replaced a detector and two layers.
  */
 import { createFeatureReader } from './features.js';
 import { Envelope } from './smoothers.js';
-import { createEmitterSystem } from './emitters.js';
 import { createArc } from './arc.js';
-import { createFlow } from './flow.js';
-import { createHits } from './hits.js';
+import { createField } from './field.js';
 import { createFeel } from './feel.js';
 import { createPalette, createBlendedPalette } from '../color/palettes.js';
 import { assignAtmospheres, ATMOSPHERES, ATMOSPHERE_NAMES } from './atmospheres.js';
 
 export function createMapping({ timeline, preset, rng }) {
   const reader = createFeatureReader();
-  const system = createEmitterSystem(preset.flow?.emitters ?? 6, rng);
 
   // Each section is matched to the atmosphere whose character fits its measurements.
   const atmosphereIndex = assignAtmospheres(timeline.sectionStats ?? {}, timeline.sectionCount ?? 0);
   const arc = createArc(atmosphereIndex);
-  const flow = createFlow(preset.flow ?? {}, rng, system);
-  const hits = createHits(preset.hits ?? {}, rng, system);
+  const field = createField(preset.field ?? {}, rng);
   const feel = createFeel(preset.feel ?? {});
   /**
    * The atmosphere owns colour identity unless something overrides it.
@@ -40,7 +38,6 @@ export function createMapping({ timeline, preset, rng }) {
   let paletteFrom = null;
   let paletteTo = null;
 
-  let tPrev = 0;
   let lastTransients = { radiusBoost: 0, bloomFlash: 0 };
 
   /**
@@ -92,7 +89,7 @@ export function createMapping({ timeline, preset, rng }) {
     timeline,
     preset,
     arc: arc.state,
-    emitters: system.emitters,
+    readers: field.readers,
 
     get paletteName() {
       return fixedPalette ? fixedPalette.name : blended.name;
@@ -137,36 +134,23 @@ export function createMapping({ timeline, preset, rng }) {
     },
     set syncOffset(v) {
       syncOffset = v;
-      timeline.resetCursor(Math.max(0, tPrev + v));
     },
 
     /** Call on seek, on load, and before frame 0 of a render. */
     reset(t = 0) {
       reader.reset();
-      system.reset();
       arc.reset();
-      flow.reset();
-      hits.reset();
+      field.reset();
       feel.reset();
-      const tRead = Math.max(0, t + syncOffset);
-      timeline.resetCursor(tRead);
-      tPrev = tRead;
       lastTransients = { radiusBoost: 0, bloomFlash: 0 };
     },
 
     applyFrame(sim, ctxFeatures, t, dt) {
-      // Everything reads the timeline at the shifted time, including the onset cursor, so
-      // hits and continuous motion stay aligned with each other.
+      // Everything reads the timeline at the shifted time, so the rise being drawn and
+      // the structure being read describe the same instant.
       const tRead = Math.max(0, t + syncOffset);
 
-      // A seek backwards, or the first frame — don't replay the whole gap as onsets.
-      if (tRead < tPrev || tRead - tPrev > 0.5) {
-        timeline.resetCursor(tRead);
-        tPrev = tRead;
-      }
-
-      const f = reader.read(timeline, tRead, dt, tPrev, ctxFeatures?.live ?? null);
-      tPrev = tRead;
+      const f = reader.read(timeline, tRead, dt, ctxFeatures?.live ?? null);
 
       const a = arc.update(readArc(tRead), dt);
 
@@ -196,8 +180,7 @@ export function createMapping({ timeline, preset, rng }) {
       }
 
       feel.apply(sim, f, dt, lastTransients, a);
-      lastTransients = hits.apply(sim, f, dt, palette, timeline, a);
-      flow.apply(sim, f, dt, palette, a);
+      lastTransients = field.apply(sim, f, dt, palette, timeline, a);
 
       return f;
     },

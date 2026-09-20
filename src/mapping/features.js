@@ -49,11 +49,7 @@ export function createFeatureReader() {
     centroid: 0.5, centroidSlope: 0,
     sustain: 0,
     activity: 0,
-    beatPhase: NaN,
-    beatIndex: -1,
-    profile: 'full',
-    onsets: [],
-    spectrum: new Float32Array(32)
+    profile: 'full'
   };
 
   function reset() {
@@ -68,7 +64,7 @@ export function createFeatureReader() {
    *              must be enough to produce the same picture, so `live` may only ever add
    *              a small high-frequency term — never change structure.
    */
-  function read(timeline, t, dt, tPrev, live = null) {
+  function read(timeline, t, dt, live = null) {
     f.t = t;
     f.profile = timeline.profile;
 
@@ -114,12 +110,6 @@ export function createFeatureReader() {
     }
     const span = Math.max(1e-3, t - refT);
     f.centroidSlope = clamp((centroid - refV) / span, -3, 3);
-
-    f.beatPhase = timeline.beatPhaseAt(t);
-    f.beatIndex = timeline.beatIndexAt(t);
-
-    timeline.onsetsBetween(tPrev, t, f.onsets);
-    timeline.spectrumAt(t, f.spectrum);
 
     // Never zero: silence should read as calm, not frozen.
     f.activity = Math.max(f.rms, f.sustain, 0.12);

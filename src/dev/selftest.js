@@ -211,28 +211,6 @@ export async function selfTest({ verbose = true, only = null, fullSeconds = 120 
       `ratio ${ratio.toFixed(3)} (${at30.splats} vs ${a.splats})`
     );
 
-    // Every onset fires exactly once, whatever the frame rate.
-    const counted = (fps) => {
-      tl.resetCursor(mid);
-      const dt = 1 / fps;
-      const seen = [];
-      let prev = mid;
-      for (let f = 1; f <= Math.round(12 * fps); f++) {
-        const t = mid + f * dt;
-        for (const o of tl.onsetsBetween(prev, t)) seen.push(o.index);
-        prev = t;
-      }
-      return seen;
-    };
-    const s60 = counted(60);
-    const s30 = counted(30);
-    const s144 = counted(144);
-    const uniq = (a) => new Set(a).size === a.length;
-    check(
-      `${label}: onsets fire once at any frame rate`,
-      uniq(s60) && uniq(s30) && uniq(s144) && s60.length === s30.length && s60.length === s144.length,
-      `${s60.length} at 60fps, ${s30.length} at 30, ${s144.length} at 144`
-    );
 
     check(
       `${label}: frame cost`,

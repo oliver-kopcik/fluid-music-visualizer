@@ -1,23 +1,16 @@
 /**
  * Read access to the analysis result.
  *
- * Two lookup styles, and the distinction matters:
- *   sampleAt()      continuous fields, interpolated — safe to call at any frame rate.
- *   onsetsBetween() discrete events, cursor-walked over the half-open interval (tPrev, t].
- *
- * Interpolating onsets would smear them; sampling them at frame times would drop the ones
- * that fall between frames and double-fire the ones near a boundary. Walking a cursor
- * means every onset fires exactly once whether we are rendering at 30, 60 or 120 fps —
- * which is what lets the offline export match the live preview.
+ * Continuous fields are read with sampleAt(), interpolated, so they are safe to call at
+ * any frame rate. There used to be a second style alongside it — a cursor walked over the
+ * onset list so every onset fired exactly once however fast we rendered. Nothing draws
+ * from discrete onsets any more (see mapping/field.js), so it is gone. The onset arrays
+ * themselves stay: the debug overlay draws them, and the analysis tests are scored on them.
  */
 
 export class Timeline {
   constructor(data) {
     Object.assign(this, data);
-    this._cursor = 0;
-    // Onset records are consumed within the frame that produced them, so they can be
-    // pooled rather than allocated fresh each time one fires.
-    this._pool = [];
   }
 
   /**
@@ -60,37 +53,6 @@ export class Timeline {
   }
 
   /** Reset the walk — call on seek, and before frame 0 of a render. */
-  resetCursor(t = 0) {
-    this._cursor = 0;
-    while (this._cursor < this.onsetTimes.length && this.onsetTimes[this._cursor] <= t) this._cursor++;
-  }
-
-  /** Every onset in (tPrev, t]. Allocation-free when nothing fired, which is most frames. */
-  onsetsBetween(tPrev, t, out = []) {
-    out.length = 0;
-    if (t < tPrev) {
-      this.resetCursor(t);
-      return out;
-    }
-    while (this._cursor < this.onsetTimes.length && this.onsetTimes[this._cursor] <= t) {
-      const i = this._cursor;
-      if (this.onsetTimes[i] > tPrev) {
-        let rec = this._pool[out.length];
-        if (!rec) rec = this._pool[out.length] = { t: 0, strength: 0, band: 'full', index: 0, pitch: 0.5, noise: 0.5, decay: 0 };
-        rec.t = this.onsetTimes[i];
-        rec.strength = this.onsetStrengths[i];
-        rec.band = BAND_LABELS[this.onsetBands[i]];
-        rec.pitch = this.onsetPitch?.[i] ?? 0.5;
-        rec.noise = this.onsetNoise?.[i] ?? 0.5;
-        rec.decay = this.onsetDecay?.[i] ?? 0;
-        rec.index = i;
-        out.push(rec);
-      }
-      this._cursor++;
-    }
-    return out;
-  }
-
   /** Position within the current beat, 0..1, or NaN when the grid isn't trustworthy. */
   beatPhaseAt(t) {
     if (!this.gridUsable || this.beats.length < 2) return NaN;

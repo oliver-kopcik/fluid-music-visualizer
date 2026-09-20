@@ -10,15 +10,20 @@
  * Dissipation runs far higher than upstream's default of 1.
  *
  * Upstream splats only on mouse movement, so dye is sparse and a slow fade looks like
- * lingering smoke. Six emitters at 60Hz inject continuously, and at a dissipation of ~1
+ * lingering smoke. A dozen readers at 60Hz inject continuously, and at a dissipation of ~1
  * the dye reaches the screen edges and stays there — the picture turns into a flat wash
  * within a couple of seconds. Swept live against the EDM track, the dark-background look
  * with vivid structure appears around 6-7. Louder passages still fade slower than quiet
  * ones, just within a much narrower band.
  */
 const base = {
-  flow: { emitters: 6, force: 220, gate: 0.06, steer: 0.9, sustainDrive: 0.6, curtain: false },
-  hits: { force: 2400 },
+  /**
+   * One layer now, so one force. `flow` and `hits` used to be tuned separately, at 220 for
+   * the ambient layer and 2400 for impulses; the field draws both from the same measured
+   * rise, so a single impulse-scale force covers it. `readers` is how finely the frequency
+   * axis is sampled.
+   */
+  field: { readers: 12, force: 2400 },
   feel: {
     ranges: { curlMin: 18, curlMax: 48, radiusMin: 0.18, radiusMax: 0.34, densityQuiet: 7.5, densityLoud: 5.0, bloomBase: 0.5 }
   },
@@ -30,8 +35,7 @@ function merge(name, label, patch) {
   return {
     name,
     label,
-    flow: { ...base.flow, ...patch.flow },
-    hits: { ...base.hits, ...patch.hits },
+    field: { ...base.field, ...patch.field },
     feel: { ranges: { ...base.feel.ranges, ...(patch.feel?.ranges ?? {}) } },
     color: { ...base.color, ...patch.color },
     sim: { ...base.sim, ...patch.sim }
@@ -40,31 +44,27 @@ function merge(name, label, patch) {
 
 export const PRESETS = {
   edm: merge('edm', 'EDM / club', {
-    flow: { force: 240, curtain: true },
-    hits: { force: 2600 },
+    field: { readers: 14, force: 2600 },
     feel: { ranges: { curlMax: 52, densityLoud: 4.5, bloomBase: 0.5 } },
     color: { palette: 'auto' }
   }),
 
-  // Nothing percussive to compete with, so hits are gentler and the sustained terms do
-  // more of the work. Steering is turned up because melodic motion is the main signal.
+  // Nothing percussive to compete with, so every rise is gentler and a lighter touch keeps
+  // the picture from being driven harder than the material warrants.
   lead: merge('lead', 'Drumless / lead', {
-    flow: { force: 260, steer: 1.2, sustainDrive: 1.0, curtain: false },
-    hits: { force: 1400 },
+    field: { readers: 12, force: 1500 },
     feel: { ranges: { curlMin: 14, curlMax: 38, densityQuiet: 8.5, densityLoud: 6.0, bloomBase: 0.4 } },
     color: { palette: 'auto' }
   }),
 
   ambient: merge('ambient', 'Ambient / slow', {
-    flow: { force: 150, steer: 0.7, sustainDrive: 1.2, curtain: false },
-    hits: { force: 1000 },
+    field: { readers: 10, force: 1100 },
     feel: { ranges: { curlMin: 10, curlMax: 28, densityQuiet: 9.0, densityLoud: 7.0, bloomBase: 0.35 } },
     color: { palette: 'auto' }
   }),
 
   pop: merge('pop', 'Pop / mixed', {
-    flow: { force: 210 },
-    hits: { force: 2200 },
+    field: { readers: 12, force: 2200 },
     color: { palette: 'auto' }
   })
 };
