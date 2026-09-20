@@ -39,7 +39,8 @@ import { spectralFlatness, onsetPitches, onsetDecays, rankNormalize } from './ti
  * track still produces ~2 low-band onsets/sec. Note these are raw FFT magnitude sums, not
  * dBFS, hence the positive values.
  *
- * This is a heuristic on a continuous quantity, so presets can override `profile`.
+ * A heuristic on a continuous quantity, so it is used to soften thresholds rather than
+ * to switch behaviour outright.
  */
 const SPARSE_TREBLE_DB = 8;
 

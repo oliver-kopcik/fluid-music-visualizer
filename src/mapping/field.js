@@ -95,13 +95,19 @@ function sampleCurve(values, position, width) {
   return weight > 0 ? sum / weight : 0;
 }
 
-export function createField(config, rng) {
-  /**
-   * How finely the frequency axis is sampled. Twelve is enough that a kick and the bass
-   * note under it land in different places, without the count itself becoming visible as
-   * a row of dots.
-   */
-  const count = config.readers ?? 12;
+/**
+ * How finely the frequency axis is sampled. Twelve is enough that a kick and the bass note
+ * under it land in different places, without the count itself becoming visible as a row of
+ * dots.
+ */
+const READERS = 12;
+/** Velocity scale for every splat, in the units splat() takes. */
+const FORCE = 2400;
+/** Never quite nothing, so a reader with a faint rise still registers. */
+const DRIVE_FLOOR = 0.015;
+
+export function createField(rng) {
+  const count = READERS;
   const color = { r: 0, g: 0, b: 0 };
 
   const now = new Float32Array(BINS);
@@ -204,8 +210,8 @@ export function createField(config, rng) {
   }
 
   function emitRound(sim, palette, arc, aspect, total) {
-    const force = config.force ?? 2600;
-    const floor = config.floor ?? 0.015;
+    const force = FORCE;
+    const floor = DRIVE_FLOOR;
     const dyeScale = arc.atmosphere?.dye ?? 1;
     let radiusBoost = 0;
 

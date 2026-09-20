@@ -15,7 +15,6 @@ import { createFluidSim } from '../fluid/fluidCore.js';
 import { createMapping } from '../mapping/index.js';
 import { createSplatRecorder } from '../util/frameHash.js';
 import { makeStreams } from '../util/rng.js';
-import { PRESETS, pickPreset } from '../presets/index.js';
 import { assignAtmospheres, ATMOSPHERE_NAMES, ATMOSPHERES } from '../mapping/atmospheres.js';
 import { createFeel } from '../mapping/feel.js';
 
@@ -35,7 +34,7 @@ function makeSim(w, h, rng, onSplat) {
 }
 
 /** Run a mapping over a span and collect everything worth asserting on. */
-async function drive(timeline, preset, { seed = 0x5eed, start = 0, seconds = 10, fps = 60, size = 192 } = {}) {
+async function drive(timeline, { seed = 0x5eed, start = 0, seconds = 10, fps = 60, size = 192 } = {}) {
   const st = makeStreams(seed);
   const rec = createSplatRecorder();
   const sim = makeSim(size, Math.round(size * 0.5625), st.rngSim, rec.onSplat);
@@ -43,7 +42,7 @@ async function drive(timeline, preset, { seed = 0x5eed, start = 0, seconds = 10,
   sim.setSize(size, Math.round(size * 0.5625));
   sim.clear();
 
-  const m = createMapping({ timeline, preset, rng: st.rngMap });
+  const m = createMapping({ timeline, rng: st.rngMap });
   m.reset(start);
 
   const dt = 1 / fps;
@@ -164,11 +163,10 @@ export async function selfTest({ verbose = true, only = null, fullSeconds = 120 
       `${distinct} distinct, ${repeats} consecutive repeats: ${Array.from(idx, (i) => ATMOSPHERE_NAMES[i]).join(' > ')}`
     );
 
-    const preset = pickPreset(tl);
 
     // Full-length pass: the real test, since it crosses every boundary in the track.
     const coveredSeconds = Math.min(tl.duration, fullSeconds);
-    const full = await drive(tl, preset, { seconds: coveredSeconds, fps: 60, size: 128 });
+    const full = await drive(tl, { seconds: coveredSeconds, fps: 60, size: 128 });
 
     // How many sections the pass actually crossed — asserting "at least 3 atmospheres"
     // regardless would fail purely because the caller asked for a short pass.
@@ -196,14 +194,14 @@ export async function selfTest({ verbose = true, only = null, fullSeconds = 120 
 
     // Determinism, over a span containing a section boundary.
     const mid = Math.min(tl.duration - 12, Math.max(0, tl.sectionBounds[1] ?? 20) - 4);
-    const a = await drive(tl, preset, { start: mid, seconds: 12 });
-    const b = await drive(tl, preset, { start: mid, seconds: 12 });
-    const c = await drive(tl, preset, { start: mid, seconds: 12, seed: 0x5eed + 1 });
+    const a = await drive(tl, { start: mid, seconds: 12 });
+    const b = await drive(tl, { start: mid, seconds: 12 });
+    const c = await drive(tl, { start: mid, seconds: 12, seed: 0x5eed + 1 });
     check(`${label}: reproducible`, a.hash === b.hash, `${a.splats} splats`);
     check(`${label}: seed changes output`, a.hash !== c.hash);
 
     // Frame-rate independence: same wall time, same splat budget.
-    const at30 = await drive(tl, preset, { start: mid, seconds: 12, fps: 30 });
+    const at30 = await drive(tl, { start: mid, seconds: 12, fps: 30 });
     const ratio = at30.splats / Math.max(1, a.splats);
     check(
       `${label}: 30fps matches 60fps`,

@@ -62,19 +62,18 @@ export function createFeel(config) {
   function applyFeel(sim, f, dt, { radiusBoost = 0, bloomFlash = 0 } = {}, arc) {
     arc = arc ?? { coil: 0, burst: 0, intensity: 1, atmosphere: null };
     const atmos = arc.atmosphere ?? {};
-    const r = config.ranges ?? {};
 
     const mid = clamp01(f.mid);
     const rms = clamp01(f.rms);
     const rmsSlow = clamp01(f.rmsSlow);
     const bassSlow = clamp01(f.bassSlow);
 
-    const curlBase = atmos.curl ?? lerp(r.curlMin ?? 18, r.curlMax ?? 48, mid);
+    const curlBase = atmos.curl ?? lerp(18, 48, mid);
     const velBase = atmos.velocity ?? 0.2;
     const pressBase = atmos.pressure ?? 0.8;
-    const densBase = atmos.density ?? lerp(r.densityQuiet ?? 7.5, r.densityLoud ?? 5, rmsSlow);
+    const densBase = atmos.density ?? lerp(7.5, 5, rmsSlow);
     const radBase = atmos.radius ?? 0.25;
-    const bloomBase = atmos.bloom ?? r.bloomBase ?? 0.5;
+    const bloomBase = atmos.bloom ?? 0.5;
     const sunBase = atmos.sunrays ?? 1;
 
     /**

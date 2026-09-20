@@ -13,7 +13,7 @@ import { decodeForAnalysis, ANALYSIS_SAMPLE_RATE } from './audio/decode.js';
 import { analyzeTrack } from './audio/analyze.js';
 import { createPlayer } from './audio/player.js';
 import { createMapping } from './mapping/index.js';
-import { PRESETS, DEFAULT_SIM, pickPreset } from './presets/index.js';
+import { SIM_DEFAULTS } from './app/simDefaults.js';
 
 const canvas = document.querySelector('canvas');
 const player = createPlayer();
@@ -22,12 +22,10 @@ const overlay = createDebugOverlay(document.body);
 let streams = makeStreams(0x5eed);
 let timeline = null;
 let mapping = null;
-let preset = null;
 let trackName = '';
-let presetChoice = 'auto';
 let seed = 0x5eed;
 
-const sim = createFluidSim(canvas, { rng: () => streams.rngSim(), initialSplats: 6, config: DEFAULT_SIM });
+const sim = createFluidSim(canvas, { rng: () => streams.rngSim(), initialSplats: 6, config: SIM_DEFAULTS });
 sim.setSize(scaleByPixelRatio(canvas.clientWidth), scaleByPixelRatio(canvas.clientHeight));
 
 attachPointerInput(sim);
@@ -45,23 +43,16 @@ let lastTime = 0;
 
 function buildMapping(at = 0) {
   if (!timeline) return;
-  mapping = createMapping({ timeline, preset, rng: streams.rngMap });
+  mapping = createMapping({ timeline, rng: streams.rngMap });
   mapping.reset(at);
   frameCtx.mapping = mapping;
-}
-
-function applyPreset(next, { rebuild = true } = {}) {
-  preset = next;
-  sim.setConfig(preset.sim);
-  if (rebuild) buildMapping(player.currentTime);
-  gui.controllers.forEach((c) => c.updateDisplay());
 }
 
 const exportPanel = createExportPanel(document.body, {
   canvas,
   player,
   // Read live, so the panel always exports what is currently on screen.
-  getState: () => ({ timeline, preset, seed, trackName })
+  getState: () => ({ timeline, seed, trackName })
 });
 
 const transport = createTransport(document.body, {
@@ -69,11 +60,6 @@ const transport = createTransport(document.body, {
   getMapping: () => mapping,
   onOpen: () => picker.show(),
   onExport: () => exportPanel.show(),
-  onPreset: (name) => {
-    presetChoice = name;
-    applyPreset(name === 'auto' ? pickPreset(timeline) : PRESETS[name]);
-    transport.setTrack(trackName, mapping);
-  },
   onPalette: (name) => mapping?.setPalette(name),
   onAtmosphere: (name) => mapping?.forceAtmosphere(name)
 });
@@ -94,21 +80,19 @@ const picker = createTrackPicker(document.body, {
     seed = result.seed;
     streams = makeStreams(result.seed);
 
-    applyPreset(presetChoice === 'auto' ? pickPreset(timeline) : PRESETS[presetChoice], { rebuild: false });
     buildMapping(0);
     sim.clear();
 
     player.load(decoded.buffer);
     await player.play();
 
-    transport.setPreset(presetChoice);
     transport.setTrack(name, mapping);
 
     console.log(
       `${name}: ${timeline.duration.toFixed(1)}s · ${timeline.onsetTimes.length} onsets · ` +
         `${timeline.tempoBPM.toFixed(1)} BPM (coh ${timeline.kickCoherence.toFixed(2)}, ` +
-        `grid ${timeline.gridUsable ? 'usable' : 'rejected'}) · profile ${timeline.profile} · ` +
-        `preset ${preset.name}${result.cached ? ' · cached' : ''}`
+        `grid ${timeline.gridUsable ? 'usable' : 'rejected'}) · profile ${timeline.profile}` +
+        `${result.cached ? ' · cached' : ''}`
     );
   }
 });
@@ -148,7 +132,7 @@ function seekBy(delta) {
 }
 
 // defineProperty, not Object.assign — assign would invoke the getter once and copy null.
-Object.assign(window, { sim, player, PRESETS, applyPreset });
+Object.assign(window, { sim, player });
 Object.defineProperty(window, 'timeline', { get: () => timeline });
 Object.defineProperty(window, 'mapping', { get: () => mapping });
 

@@ -125,7 +125,6 @@ export function createExportPanel(container, { canvas, player, getState }) {
     try {
       const result = await renderToFile({
         timeline: state.timeline,
-        preset: state.preset,
         audioBuffer: player.buffer,
         seed: state.seed,
         resolution: $('.ep-res').value,

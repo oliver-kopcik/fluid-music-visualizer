@@ -12,7 +12,6 @@ import { createSpectrogram } from '../audio/spectra.js';
 import { createFluidSim } from '../fluid/fluidCore.js';
 import { createMapping } from '../mapping/index.js';
 import { makeStreams } from '../util/rng.js';
-import { pickPreset } from '../presets/index.js';
 import * as synth from './synth.js';
 
 async function analyse(mono, name) {
@@ -415,7 +414,7 @@ export async function synthTest({ verbose = true } = {}) {
     await sim.ready;
     sim.setSize(128, 72);
     sim.clear();
-    const m = createMapping({ timeline: tl, preset: pickPreset(tl), rng: st.rngMap });
+    const m = createMapping({ timeline: tl, rng: st.rngMap });
     m.reset(2);
     for (let f = 0; f < 300; f++) {
       m.applyFrame(sim, { live: null }, 2 + f / 60, 1 / 60);
@@ -466,7 +465,7 @@ export async function synthTest({ verbose = true } = {}) {
     await sim.ready;
     sim.setSize(128, 72);
     sim.clear();
-    const m = createMapping({ timeline: tl, preset: pickPreset(tl), rng: st.rngMap });
+    const m = createMapping({ timeline: tl, rng: st.rngMap });
     m.reset(0);
 
     const trace = [];

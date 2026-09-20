@@ -28,7 +28,7 @@ export function hashString(str) {
 /**
  * The sim and the mapping layer draw from separate streams. If they shared one, adding a
  * single random call on the sim side would shift every subsequent mapping decision and
- * silently change how an already-tuned preset looks.
+ * silently change how an already-tuned look comes out.
  */
 export function makeStreams(seed) {
   return {

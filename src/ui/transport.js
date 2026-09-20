@@ -11,7 +11,6 @@
  * goes on <body>, so the key hints and the simulation panel fade with it — they are the
  * same decision, and running three timers would let them drift apart on screen.
  */
-import { PRESETS } from '../presets/index.js';
 import { PALETTE_NAMES } from '../color/palettes.js';
 import { ATMOSPHERE_NAMES } from '../mapping/atmospheres.js';
 
@@ -23,7 +22,7 @@ const fmt = (s) => {
   return `${m}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 };
 
-export function createTransport(container, { player, getMapping, onPreset, onPalette, onAtmosphere, onOpen, onExport }) {
+export function createTransport(container, { player, getMapping, onPalette, onAtmosphere, onOpen, onExport }) {
   const root = document.createElement('div');
   root.className = 'transport';
   root.innerHTML = `
@@ -38,9 +37,6 @@ export function createTransport(container, { player, getMapping, onPreset, onPal
       <span class="tp-title">no track</span>
       <span class="tp-spacer"></span>
       <span class="tp-badge" title="Current atmosphere">—</span>
-      <label class="tp-field">preset
-        <select class="tp-preset"></select>
-      </label>
       <label class="tp-field">palette
         <select class="tp-palette"></select>
       </label>
@@ -64,7 +60,6 @@ export function createTransport(container, { player, getMapping, onPreset, onPal
   const timeEl = $('.tp-time');
   const titleEl = $('.tp-title');
   const badgeEl = $('.tp-badge');
-  const presetSel = $('.tp-preset');
   const paletteSel = $('.tp-palette');
   const atmosSel = $('.tp-atmos');
   const volume = $('.tp-volume');
@@ -79,7 +74,6 @@ export function createTransport(container, { player, getMapping, onPreset, onPal
     });
   };
 
-  opt(presetSel, ['auto', ...Object.keys(PRESETS)], ['auto', ...Object.values(PRESETS).map((p) => p.label)]);
   opt(paletteSel, ['auto', ...PALETTE_NAMES]);
   opt(atmosSel, ['auto', ...ATMOSPHERE_NAMES]);
 
@@ -87,7 +81,6 @@ export function createTransport(container, { player, getMapping, onPreset, onPal
   $('.tp-open').onclick = () => onOpen?.();
   $('.tp-export').onclick = () => onExport?.();
   volume.oninput = () => player.setVolume(Number(volume.value));
-  presetSel.onchange = () => onPreset?.(presetSel.value);
   paletteSel.onchange = () => onPalette?.(paletteSel.value);
   atmosSel.onchange = () => onAtmosphere?.(atmosSel.value === 'auto' ? null : atmosSel.value);
 
@@ -206,9 +199,6 @@ export function createTransport(container, { player, getMapping, onPreset, onPal
       buildSections(mapping);
       syncSelects(mapping);
       wake();
-    },
-    setPreset(name) {
-      presetSel.value = name;
     },
     wake
   };

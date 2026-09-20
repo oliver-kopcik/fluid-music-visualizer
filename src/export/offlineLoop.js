@@ -14,6 +14,7 @@
  *   - the canvas is pinned to the export size and never resized mid-render
  */
 import { createFluidSim } from '../fluid/fluidCore.js';
+import { SIM_DEFAULTS } from '../app/simDefaults.js';
 import { createMapping } from '../mapping/index.js';
 import { makeStreams } from '../util/rng.js';
 import { createSink, downloadBlob, estimateBytes, canStreamToDisk } from './fileSink.js';
@@ -38,7 +39,7 @@ export const RESOLUTIONS = {
  * The caller disposes `sim`, since it may still need to read from the canvas.
  */
 export async function driveFrames(
-  { timeline, preset, seed, width, height, fps, dyeResolution = 1024, startTime = 0, totalFrames, signal },
+  { timeline, seed, width, height, fps, dyeResolution = 1024, startTime = 0, totalFrames, signal },
   onFrame
 ) {
   const canvas = document.createElement('canvas');
@@ -50,11 +51,11 @@ export async function driveFrames(
 
   // Frame 0 must not run against the placeholder dithering texture.
   await sim.ready;
-  sim.setConfig({ ...preset.sim, DYE_RESOLUTION: dyeResolution, PAUSED: false, TRANSPARENT: false });
+  sim.setConfig({ ...SIM_DEFAULTS, DYE_RESOLUTION: dyeResolution, PAUSED: false, TRANSPARENT: false });
   sim.setSize(width, height);
   sim.clear();
 
-  const mapping = createMapping({ timeline, preset, rng: streams.rngMap });
+  const mapping = createMapping({ timeline, rng: streams.rngMap });
   mapping.reset(startTime);
 
   // `interactive` is never set, so applyInputs is never called and no pointer state can
@@ -75,7 +76,6 @@ export async function driveFrames(
 
 export async function renderToFile({
   timeline,
-  preset,
   audioBuffer,
   seed,
   resolution = '1080p',
@@ -142,7 +142,7 @@ export async function renderToFile({
 
     const started = performance.now();
     const run = await driveFrames(
-      { timeline, preset, seed, width, height, fps, dyeResolution, startTime, totalFrames, signal },
+      { timeline, seed, width, height, fps, dyeResolution, startTime, totalFrames, signal },
       async (canvas, frame) => {
         if (encoderFailed) return false;
         await encoder.addFrame(canvas, frame);
@@ -211,7 +211,6 @@ export async function renderToFile({
  */
 export async function verifyRenderDeterminism({
   timeline,
-  preset,
   seed = 0x5eed,
   startTime = 0,
   seconds = 3,
@@ -225,7 +224,7 @@ export async function verifyRenderDeterminism({
     const hashes = [];
     let buffer = null;
     const run = await driveFrames(
-      { timeline, preset, seed: useSeed, width, height, fps, dyeResolution: 512, startTime, totalFrames },
+      { timeline, seed: useSeed, width, height, fps, dyeResolution: 512, startTime, totalFrames },
       (canvas, frame, sim) => {
         const gl = sim.gl;
         const w = gl.drawingBufferWidth;
@@ -273,16 +272,14 @@ export async function verifyRenderDeterminism({
  * Sidecar metadata, so a render can be reproduced later.
  *
  * Determinism is only useful if you can still say what produced a given file — seed,
- * preset and the GL extension set all change the output.
+ * seed and the GL extension set all change the output.
  */
-export function renderSidecar({ timeline, preset, seed, result }) {
+export function renderSidecar({ timeline, seed, result }) {
   return {
     track: timeline.name,
     duration: timeline.duration,
     analysisVersion: timeline.version,
     seed,
-    preset: preset.name,
-    palette: preset.color?.palette ?? 'auto',
     tempoBPM: timeline.tempoBPM,
     gridUsable: timeline.gridUsable,
     profile: timeline.profile,
