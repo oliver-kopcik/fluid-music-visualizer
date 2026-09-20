@@ -19,6 +19,7 @@ import {
 import { normalizeRobust, scaleByP95, percentile } from './normalize.js';
 import { detectOnsets, mergeOnsets, DEFAULT_PARAMS } from './onsets.js';
 import { estimateTempo, CONFIDENCE_THRESHOLD } from './tempo.js';
+import { analyzeSections } from './sections.js';
 
 /**
  * Treble level below which we assume there is no drum kit.
@@ -199,8 +200,15 @@ function analyze(samples, sampleRate, name, onProgress) {
   const sustain = new Float32Array(n);
   for (let f = 0; f < n; f++) sustain[f] = Math.max(0, Math.min(1, rmsNorm[f] - 0.5 * fluxNorm[f]));
 
+  // Structure: where the sections are, and what is about to happen.
+  const structure = analyzeSections(
+    { rms: rmsNorm, bass: bands.bass, mid: bands.mid, treble: bands.treble, centroidNorm },
+    FRAME_RATE
+  );
+
   return {
-    version: 8,
+    version: 9,
+    ...structure,
     name,
     frameRate: FRAME_RATE,
     numFrames: n,

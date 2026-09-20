@@ -32,15 +32,23 @@ export function createFeel(config) {
     sunrays.reset(1);
   }
 
-  function apply(sim, f, dt, { radiusBoost = 0, bloomFlash = 0 } = {}) {
+  function apply(sim, f, dt, { radiusBoost = 0, bloomFlash = 0 } = {}, arc) {
     const r = config.ranges ?? {};
     const mid = clamp01(f.mid);
     const rms = clamp01(f.rms);
     const rmsSlow = clamp01(f.rmsSlow);
     const bassSlow = clamp01(f.bassSlow);
+    arc = arc ?? { coil: 0, burst: 0, intensity: 1 };
 
+    /**
+     * Curl is the main "posture" parameter. A coil winds it right up so the picture
+     * visibly tightens before a drop; the burst that follows relaxes it, which reads as
+     * the tension letting go.
+     */
     patch.CURL = curl.step(
-      lerp(r.curlMin ?? 18, r.curlMax ?? 48, mid) * (1 + 0.5 * clamp01(f.trebleFast - 0.5)),
+      lerp(r.curlMin ?? 18, r.curlMax ?? 48, mid) *
+        (1 + 0.5 * clamp01(f.trebleFast - 0.5)) *
+        (1 + 1.4 * arc.coil - 0.25 * arc.burst),
       dt
     );
 
@@ -49,7 +57,17 @@ export function createFeel(config) {
     const baseRadius = radius.step(lerp(r.radiusMin ?? 0.18, r.radiusMax ?? 0.34, bassSlow), dt);
     patch.SPLAT_RADIUS = baseRadius * (1 + radiusBoost);
 
-    patch.DENSITY_DISSIPATION = density.step(lerp(r.densityQuiet ?? 1.6, r.densityLoud ?? 0.55, rmsSlow), dt);
+    /**
+     * Trails lengthen with the arc, not just the level. During a coil the dye is cleared
+     * faster so the screen darkens into the drop, and the burst then leaves long streaks
+     * behind it — the contrast between those two is most of what makes a drop land.
+     */
+    patch.DENSITY_DISSIPATION = density.step(
+      lerp(r.densityQuiet ?? 7.5, r.densityLoud ?? 5, rmsSlow) *
+        (1 + 0.55 * arc.coil) *
+        (1 - 0.35 * arc.burst),
+      dt
+    );
     patch.VELOCITY_DISSIPATION = velocity.step(lerp(0.35, 0.12, rmsSlow), dt);
     patch.PRESSURE = pressure.step(0.8 - 0.15 * clamp01(f.bass), dt);
 
@@ -63,7 +81,10 @@ export function createFeel(config) {
      * backwards: loud already means more dye and brighter pixels, so it double-counts.
      * The threshold now rises slightly with level, which holds the highlights together.
      */
-    patch.BLOOM_INTENSITY = bloom.step((r.bloomBase ?? 0.5) + 0.45 * rms + bloomFlash, dt);
+    patch.BLOOM_INTENSITY = bloom.step(
+      (r.bloomBase ?? 0.5) + 0.45 * rms * arc.intensity + bloomFlash + 0.5 * arc.burst,
+      dt
+    );
     patch.BLOOM_THRESHOLD = 0.6 + 0.1 * rms;
     patch.SUNRAYS_WEIGHT = sunrays.step(0.6 + 0.9 * clamp01(f.centroid), dt);
 

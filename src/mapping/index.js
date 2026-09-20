@@ -1,10 +1,16 @@
 /**
- * Orchestrates the three layers. This is the object renderFrame() calls.
+ * Orchestrates the layers. This is the object renderFrame() calls.
  *
- * Order matters: FEEL first so the splat radius and dissipation this frame's splats land
- * into are already correct, then HITS (which may bump the radius further), then FLOW.
+ * ARC runs first and decides the posture — is the track coiling toward something,
+ * bursting out of it, or resting — and how much output this moment deserves. Everything
+ * downstream reads that, which is what stops a drop from being merely a louder verse.
+ *
+ * Then FEEL (so the splat radius and dissipation this frame's splats land into are right),
+ * then HITS (which shove the emitters and may bump the radius further), then FLOW.
  */
 import { createFeatureReader } from './features.js';
+import { createEmitterSystem } from './emitters.js';
+import { createArc } from './arc.js';
 import { createFlow } from './flow.js';
 import { createHits } from './hits.js';
 import { createFeel } from './feel.js';
@@ -12,8 +18,10 @@ import { createPalette } from '../color/palettes.js';
 
 export function createMapping({ timeline, preset, rng }) {
   const reader = createFeatureReader();
-  const flow = createFlow(preset.flow ?? {}, rng);
-  const hits = createHits(preset.hits ?? {}, rng);
+  const system = createEmitterSystem(preset.flow?.emitters ?? 6, rng);
+  const arc = createArc();
+  const flow = createFlow(preset.flow ?? {}, rng, system);
+  const hits = createHits(preset.hits ?? {}, rng, system);
   const feel = createFeel(preset.feel ?? {});
   let palette = createPalette(preset.color?.palette ?? 'spectral', rng);
 
@@ -32,15 +40,32 @@ export function createMapping({ timeline, preset, rng }) {
    */
   let syncOffset = preset.syncOffset ?? 0.045;
 
-  // Only speed the emitters with tempo when the grid is trustworthy.
-  const tempoScale =
-    timeline.gridUsable && timeline.tempoBPM
-      ? 1 + 0.5 * (timeline.tempoBPM / 120 - 1)
-      : 1;
+  /** Structural curves for the current instant, reused each frame. */
+  const arcInput = {
+    kind: 'mid',
+    tension: 0,
+    imminence: 0,
+    release: 0,
+    energy: 0,
+    sectionIndex: 0
+  };
+
+  function readArc(t) {
+    const frame = Math.min(timeline.numFrames - 1, Math.max(0, Math.round(t * timeline.frameRate)));
+    arcInput.kind = KIND_NAMES[timeline.sectionKinds?.[frame] ?? 1];
+    arcInput.tension = timeline.sampleAt('tension', t);
+    arcInput.imminence = timeline.sampleAt('imminence', t);
+    arcInput.release = timeline.sampleAt('release', t);
+    arcInput.energy = timeline.sampleAt('energySlow', t);
+    arcInput.sectionIndex = timeline.sectionIndex?.[frame] ?? 0;
+    return arcInput;
+  }
 
   return {
     timeline,
     preset,
+    arc: arc.state,
+    emitters: system.emitters,
 
     get paletteName() {
       return palette.name;
@@ -49,9 +74,19 @@ export function createMapping({ timeline, preset, rng }) {
       palette = createPalette(name, rng);
     },
 
+    get syncOffset() {
+      return syncOffset;
+    },
+    set syncOffset(v) {
+      syncOffset = v;
+      timeline.resetCursor(Math.max(0, tPrev + v));
+    },
+
     /** Call on seek, on load, and before frame 0 of a render. */
     reset(t = 0) {
       reader.reset();
+      system.reset();
+      arc.reset();
       flow.reset();
       hits.reset();
       feel.reset();
@@ -59,14 +94,6 @@ export function createMapping({ timeline, preset, rng }) {
       timeline.resetCursor(tRead);
       tPrev = tRead;
       lastTransients = { radiusBoost: 0, bloomFlash: 0 };
-    },
-
-    get syncOffset() {
-      return syncOffset;
-    },
-    set syncOffset(v) {
-      syncOffset = v;
-      timeline.resetCursor(Math.max(0, tPrev + v));
     },
 
     applyFrame(sim, ctxFeatures, t, dt) {
@@ -83,9 +110,11 @@ export function createMapping({ timeline, preset, rng }) {
       const f = reader.read(timeline, tRead, dt, tPrev, ctxFeatures?.live ?? null);
       tPrev = tRead;
 
-      feel.apply(sim, f, dt, lastTransients);
-      lastTransients = hits.apply(sim, f, dt, palette, timeline);
-      flow.apply(sim, f, dt, palette, tempoScale);
+      const a = arc.update(readArc(tRead), dt);
+
+      feel.apply(sim, f, dt, lastTransients, a);
+      lastTransients = hits.apply(sim, f, dt, palette, timeline, a);
+      flow.apply(sim, f, dt, palette, a);
 
       return f;
     },
@@ -95,3 +124,5 @@ export function createMapping({ timeline, preset, rng }) {
     }
   };
 }
+
+const KIND_NAMES = ['quiet', 'mid', 'high'];

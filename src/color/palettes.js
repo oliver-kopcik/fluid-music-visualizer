@@ -87,7 +87,7 @@ export function createPalette(name, rng = Math.random) {
     return {
       name,
       /** Upstream's behaviour, kept as an option: ignores the audio entirely. */
-      colorAt(_position, intensity, out = {}) {
+      colorAt(_position, intensity, out = {}, _hueOffset = 0) {
         const h = rng();
         const [r, g, b] = hsvToRgb(h, 1, 1);
         out.r = r * intensity;
@@ -105,9 +105,15 @@ export function createPalette(name, rng = Math.random) {
      * @param position  0..1, normally the spectral centroid
      * @param intensity scales the dye deposited; useful range is roughly 0.1-0.6, above
      *                  ~1.0 the dye saturates and bloom blows out
+     * @param hueOffset 0..1, rotates where in the palette we read.
+     *
+     * The arc layer walks hueOffset by a fixed irrational step per section, which is what
+     * makes a new section arrive in a new colour. Without it the centroid alone barely
+     * moves within a track and every section came out the same hue.
      */
-    colorAt(position, intensity, out = {}) {
-      const i = Math.min(LUT_SIZE - 1, Math.max(0, Math.round(position * (LUT_SIZE - 1)))) * 3;
+    colorAt(position, intensity, out = {}, hueOffset = 0) {
+      const shifted = (position + hueOffset) % 1;
+      const i = Math.min(LUT_SIZE - 1, Math.max(0, Math.round(shifted * (LUT_SIZE - 1)))) * 3;
       out.r = lut[i] * intensity;
       out.g = lut[i + 1] * intensity;
       out.b = lut[i + 2] * intensity;

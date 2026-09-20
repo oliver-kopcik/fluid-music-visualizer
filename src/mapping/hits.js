@@ -14,7 +14,7 @@ import { clamp, clamp01 } from './smoothers.js';
 
 const MAX_SPLATS_PER_FRAME = 16;
 
-export function createHits(config, rng) {
+export function createHits(config, rng, system) {
   const color = { r: 0, g: 0, b: 0 };
   let sinceOnset = 999;
   let radiusBoost = 0;
@@ -26,12 +26,15 @@ export function createHits(config, rng) {
     bloomFlash = 0;
   }
 
-  function apply(sim, f, dt, palette, timeline) {
+  function apply(sim, f, dt, palette, timeline, arc) {
     sinceOnset += dt;
     radiusBoost = 0;
     bloomFlash = 0;
 
     if (f.onsets.length === 0) return { radiusBoost, bloomFlash };
+
+    // Quiet sections get gentler hits, so the loud ones have somewhere to go.
+    const gain = 0.35 + 0.75 * arc.intensity;
 
     const aspect = sim.canvas.width / sim.canvas.height;
     const baseForce = config.force ?? (f.profile === 'sparse' ? 1400 : 2400);
@@ -53,13 +56,15 @@ export function createHits(config, rng) {
       }
       sinceOnset = 0;
 
-      if (onset.band === 'low') budget -= kick(sim, f, s, force, aspect, palette, timeline);
-      else if (onset.band === 'high') budget -= snare(sim, f, s, force, aspect, palette);
-      else budget -= generic(sim, f, s, force, aspect, palette);
+      force *= gain;
+
+      if (onset.band === 'low') budget -= kick(sim, f, s, force, aspect, palette, timeline, arc);
+      else if (onset.band === 'high') budget -= snare(sim, f, s, force, aspect, palette, arc);
+      else budget -= generic(sim, f, s, force, aspect, palette, arc);
 
       // Downbeats get an extra centred burst and a bloom flash.
       if (timeline.gridUsable && timeline.nearestDownbeatDistance(onset.t) < 0.06) {
-        budget -= downbeat(sim, f, s, force, aspect, palette);
+        budget -= downbeat(sim, f, s, force, aspect, palette, arc);
         bloomFlash = Math.max(bloomFlash, 0.45 * s);
       }
     }
@@ -67,7 +72,7 @@ export function createHits(config, rng) {
     return { radiusBoost, bloomFlash };
   }
 
-  function kick(sim, f, s, force, aspect, palette, timeline) {
+  function kick(sim, f, s, force, aspect, palette, timeline, arc) {
     // Walk the burst around the frame by bar position so successive bars don't stack.
     let cx = 0.5;
     let cy = 0.3;
@@ -79,7 +84,7 @@ export function createHits(config, rng) {
 
     const n = 5;
     const r = 0.05;
-    palette.colorAt(clamp01(f.centroid * 0.6), 0.45 + 0.35 * s, color);
+    palette.colorAt(clamp01(f.centroid * 0.6), (0.3 + 0.3 * s) * (0.5 + 0.7 * arc.intensity), color, arc.hueOffset);
     for (let i = 0; i < n; i++) {
       const a = (2 * Math.PI * i) / n + rng() * 0.4;
       const speed = force * (0.8 + 0.4 * rng());
@@ -92,32 +97,38 @@ export function createHits(config, rng) {
       );
     }
 
+    // Shove the emitters away from the kick. This is what makes the formation react to
+    // the music rather than only the dye — the consequence outlives the frame.
+    system.impulse(cx, cy, 0.9 * s * (0.4 + 0.8 * arc.intensity), aspect);
+
     // The transient that gives a kick its weight. Restored by FEEL next frame.
     radiusBoost = Math.max(radiusBoost, 0.6 + 1.2 * s);
     return n;
   }
 
-  function snare(sim, f, s, force, aspect, palette) {
+  function snare(sim, f, s, force, aspect, palette, arc) {
     const spread = 0.18 + 0.12 * s;
     const y = 0.62;
-    palette.colorAt(clamp01(0.55 + f.centroid * 0.45), 0.3 + 0.3 * s, color);
+    // Deliberately far around the palette from the flow: hits should read as their own
+    // colour punching in, not as a brighter version of what is already there.
+    palette.colorAt(clamp01(0.55 + f.centroid * 0.45), (0.22 + 0.26 * s) * (0.5 + 0.7 * arc.intensity), color, arc.hueOffset + 0.4);
     sim.splat(clamp(0.5 - spread, 0.02, 0.98), y, force * 1.1, 0, color);
     sim.splat(clamp(0.5 + spread, 0.02, 0.98), y, -force * 1.1, 0, color);
     return 2;
   }
 
-  function generic(sim, f, s, force, aspect, palette) {
+  function generic(sim, f, s, force, aspect, palette, arc) {
     const x = clamp(0.2 + f.centroid * 0.6, 0.05, 0.95);
     const y = clamp(0.3 + f.rms * 0.4, 0.05, 0.95);
     const a = rng() * 2 * Math.PI;
-    palette.colorAt(f.centroid, 0.25 + 0.3 * s, color);
+    palette.colorAt(f.centroid, (0.18 + 0.25 * s) * (0.5 + 0.7 * arc.intensity), color, arc.hueOffset + 0.4);
     sim.splat(x, y, Math.cos(a) * force * 0.8, Math.sin(a) * aspect * force * 0.8, color);
     return 1;
   }
 
-  function downbeat(sim, f, s, force, aspect, palette) {
+  function downbeat(sim, f, s, force, aspect, palette, arc) {
     const n = 8;
-    palette.colorAt(clamp01(f.centroid), 0.4 + 0.3 * s, color);
+    palette.colorAt(clamp01(f.centroid), (0.28 + 0.26 * s) * (0.5 + 0.7 * arc.intensity), color, arc.hueOffset + 0.2);
     for (let i = 0; i < n; i++) {
       const a = (2 * Math.PI * i) / n;
       sim.splat(
@@ -128,6 +139,8 @@ export function createHits(config, rng) {
         color
       );
     }
+    // Whip the whole formation round on a downbeat.
+    system.torque(1.6 * s);
     return n;
   }
 

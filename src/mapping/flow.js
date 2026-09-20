@@ -1,20 +1,15 @@
 /**
- * FLOW — the continuous layer. Constant motion proportional to band energy.
+ * FLOW — the continuous layer, riding the physical emitters.
  *
- * Six emitters ride a slowly wobbling ring, each bound to a frequency band. Low emitters
- * read the slow envelope so bass reads as body; high emitters read the fast one so treble
- * reads as shimmer.
+ * Each emitter splats along its own motion: the velocity it injects is the direction it
+ * is actually travelling, so the dye follows the emitter's path instead of being pushed
+ * along a formula. When a kick throws the emitters outward, the dye is visibly thrown
+ * with them.
  *
- * Two details carry most of the visual quality:
- *
- * - Tangential direction alternates sign by emitter index. With a single direction the
- *   whole frame becomes one lazy global swirl; alternating produces counter-rotating
- *   vortex pairs that shear against each other, which is what the fluid solver is
- *   actually good at showing.
- *
- * - Everything scales by dt/(1/60). splat() is an impulse, not a rate, so without this a
- *   30fps preview deposits half the momentum per second that a 60fps export does, and the
- *   two stop matching.
+ * Emission runs on a fixed 60Hz clock rather than once per rendered frame. Scaling dye by
+ * dt is not enough on its own — a half-strength splat still paints a full-size disc, so a
+ * 157fps display covered the screen 2.6x as fast as a 60fps one. A fixed clock fixes
+ * coverage as well as amount, and makes the preview and the export agree by construction.
  */
 import { clamp, clamp01 } from './smoothers.js';
 
@@ -24,130 +19,126 @@ const BANDS_FULL = ['bassDrive', 'bassDrive', 'mid', 'mid', 'trebleFast', 'trebl
 // Nothing in the low end to drive the first emitters, so shift everything up a band.
 const BANDS_SPARSE = ['mid', 'mid', 'mid', 'centroidEnergy', 'trebleFast', 'trebleFast'];
 
-export function createFlow(config, rng) {
-  const K = config.emitters ?? 6;
-  const emitters = [];
-  for (let i = 0; i < K; i++) {
-    emitters.push({
-      phase: (i * 2 * Math.PI) / K + rng() * 0.3,
-      radius: 0.22 + 0.1 * (i / K),
-      omega: 0.18 + 0.07 * i,
-      parity: i % 2 ? 1 : -1
-    });
-  }
-
-  // Deterministic clock: accumulated dt, never performance.now().
-  let T = 0;
+export function createFlow(config, rng, system) {
   let emitAccumulator = 0;
   const color = { r: 0, g: 0, b: 0 };
 
   function reset() {
-    T = 0;
     emitAccumulator = 0;
   }
 
-  function apply(sim, f, dt, palette, tempoScale = 1) {
-    T += dt;
-
-    /**
-     * Emit at a fixed 60 Hz rather than once per rendered frame.
-     *
-     * Scaling dye by dt is not enough on its own: a half-strength splat still paints a
-     * full-size disc, so a 157fps display covered the screen 2.6x as fast as a 60fps one
-     * even with the same dye per second, and the frame saturated to white. Emitting on a
-     * fixed clock fixes the coverage as well as the amount — and it makes the preview and
-     * the export produce the same picture by construction, whatever rate each runs at.
-     */
+  function apply(sim, f, dt, palette, arc) {
     emitAccumulator += dt;
     if (emitAccumulator < REFERENCE_DT) return;
     // Cap the catch-up so a stall doesn't dump a burst of splats on the next frame.
     const rounds = Math.min(2, Math.floor(emitAccumulator / REFERENCE_DT));
     emitAccumulator -= rounds * REFERENCE_DT;
 
-    const k = rounds;
     const aspect = sim.canvas.width / sim.canvas.height;
     const bands = f.profile === 'sparse' ? BANDS_SPARSE : BANDS_FULL;
-
     const force = config.force ?? 220;
     const gate = config.gate ?? 0.06;
 
-    for (let i = 0; i < emitters.length; i++) {
-      const e = emitters[i];
+    const swirl = 2.5 + 9 * arc.coil + 5 * arc.burst;
+
+    /**
+     * Each round steps the physics AND emits, rather than emitting once with a doubled
+     * amount. Doubling gets the dye quantity right but not the coverage — a 30fps preview
+     * would lay down 30 discs per second where a 60fps export lays 60, so the two would
+     * not actually match. Stepping and emitting together means the splats land at the
+     * positions the emitters genuinely passed through, at any frame rate.
+     */
+    for (let r = 0; r < rounds; r++) {
+      system.step(arc.formation, aspect, REFERENCE_DT, swirl);
+      emitRound(sim, f, palette, arc, aspect, bands, force, gate);
+    }
+  }
+
+  function emitRound(sim, f, palette, arc, aspect, bands, force, gate) {
+
+    /**
+     * Dynamic range lives here. In a quiet section arc.intensity falls to ~0.2, most
+     * emitters drop below the gate, and the screen genuinely empties out — which is the
+     * only thing that makes the loud sections land.
+     */
+    const active = Math.max(1, Math.round(system.emitters.length * (0.35 + 0.65 * arc.intensity)));
+
+    for (let i = 0; i < system.emitters.length; i++) {
+      if (i >= active) continue;
+      const e = system.emitters[i];
+
       const band = bands[i % bands.length];
       const raw = band === 'centroidEnergy' ? f.centroid * f.rms : f[band];
 
       // A held note keeps pushing even when nothing is attacking — without this a
-      // drumless track goes still between phrases.
-      const drive = Math.max(0, raw - gate) + (config.sustainDrive ?? 0.6) * f.sustain;
-      if (drive <= 0.001 && f.activity < 0.18) continue;
+      // drumless track goes still between phrases. e.energy carries recent hits, so an
+      // emitter that was just struck keeps glowing for a moment.
+      const drive =
+        (Math.max(0, raw - gate) + (config.sustainDrive ?? 0.6) * f.sustain + e.energy * 0.5) *
+        arc.intensity;
+      if (drive <= 0.004) continue;
 
-      const theta = e.phase + e.omega * tempoScale * T;
-      const wobble = 0.045 * Math.sin(2.7 * T + 3.1 * i);
-      const r = e.radius + wobble;
+      // Direction of travel, not a formula. This is what ties the dye to the physics.
+      let dx = e.x - e.prevX;
+      let dy = e.y - e.prevY;
+      let len = Math.hypot(dx, dy);
+      if (len < 1e-5) {
+        // Barely moving: fall back to a tangent so a resting emitter still stirs.
+        dx = -(e.y - 0.5);
+        dy = e.x - 0.5;
+        len = Math.hypot(dx, dy) || 1;
+      }
 
-      // sin scaled by aspect so the ring is a circle on screen, matching splat()'s own
-      // aspect correction.
-      const x = 0.5 + r * Math.cos(theta);
-      const y = 0.5 + r * aspect * Math.sin(theta);
-      if (x < 0.02 || x > 0.98 || y < 0.02 || y > 0.98) continue;
-
-      const mag = force * Math.pow(clamp(drive, 0, 2), 1.4) * k;
-
-      let dx = -Math.sin(theta) * e.parity;
-      let dy = Math.cos(theta) * aspect * e.parity;
-      const radial = 0.35 * Math.sin(0.6 * T + i);
-      dx += Math.cos(theta) * radial;
-      dy += Math.sin(theta) * aspect * radial;
-
-      // Melodic steering: brightness rising pushes outward, falling pulls in.
+      // Melodic steering: brightness rising sweeps the flow outward, falling pulls it in.
       const steer = clamp(f.centroidSlope, -1, 1) * (config.steer ?? 0.9);
       const cs = Math.cos(steer);
       const sn = Math.sin(steer);
-      const rx = dx * cs - dy * sn;
-      const ry = dx * sn + dy * cs;
+      const rx = (dx * cs - dy * sn) / len;
+      const ry = (dx * sn + dy * cs) / len;
 
-      const len = Math.hypot(rx, ry) || 1;
-      // Held deliberately low. Upstream splats a handful of times per second on mouse
-      // movement; six emitters at 60Hz is ~360/s, so each one has to be far fainter than
-      // a mouse splat or the screen fills within a couple of seconds.
-      const dye = (0.015 + 0.055 * Math.pow(clamp01(drive), 0.8)) * k;
-      palette.colorAt(clamp01(f.centroid + i * 0.03), dye, color);
+      const mag = force * Math.pow(clamp(drive, 0, 2), 1.3) * (0.6 + 1.1 * arc.intensity);
 
-      sim.splat(x, y, (rx / len) * mag, (ry / len) * mag, color);
+      // Held deliberately low: six emitters at 60Hz is ~360 splats/sec, so each has to be
+      // far fainter than a mouse splat or the screen fills within a couple of seconds.
+      const dye = (0.012 + 0.05 * Math.pow(clamp01(drive), 0.8)) * (0.4 + 0.9 * arc.intensity);
+      palette.colorAt(clamp01(f.centroid + i * 0.03), dye, color, arc.hueOffset);
+
+      sim.splat(e.x, e.y, rx * mag, ry * mag, color);
     }
 
-    if (config.curtain) applyCurtain(sim, f, k, palette, aspect);
-    applyIdleBed(sim, f, k, palette, T);
+    if (config.curtain) applyCurtain(sim, f, 1, palette, aspect, arc);
+    applyIdleBed(sim, f, 1, palette, arc, system.time);
   }
 
   /**
    * A row of tiny upward splats along the bottom edge, driven by the 32-band spectrum.
-   * Reads as a spectrum without literally drawing bars, for ~0.3ms of extra draw calls.
+   * Reads as a spectrum without literally drawing bars.
    */
-  function applyCurtain(sim, f, k, palette, aspect) {
+  function applyCurtain(sim, f, k, palette, aspect, arc) {
     const n = f.spectrum.length;
     for (let j = 0; j < n; j++) {
-      const s = f.spectrum[j];
-      // 32 splats per emission adds up fast; skip the quiet bins entirely and keep the
-      // rest faint, or the curtain alone dominates the dye budget.
+      const s = f.spectrum[j] * arc.intensity;
+      // 32 splats per emission adds up fast; skip the quiet bins, keep the rest faint.
       if (s < 0.25) continue;
       const x = (j + 0.5) / n;
-      palette.colorAt(j / n, (0.008 + 0.022 * s) * k, color);
+      palette.colorAt(j / n, (0.008 + 0.022 * s) * k, color, arc.hueOffset);
       sim.splat(x, 0.02, 0, 90 * s * k * aspect, color);
     }
   }
 
   /**
-   * Two slow counter-rotating splats that never stop. Silence should look calm, not
-   * frozen, and a quiet passage with nothing moving reads as a bug.
+   * One slow wandering stir that never quite stops. Silence should read as calm, not
+   * frozen — but it is deliberately feeble, because a quiet section that still looks busy
+   * is exactly what stops the loud ones from landing.
    */
-  function applyIdleBed(sim, f, k, palette, T) {
-    if (f.activity > 0.35) return;
-    const drift = Math.sin(T * 0.3) * 0.04;
-    palette.colorAt(f.centroid, 0.02 * k, color);
-    sim.splat(0.35, 0.5 + drift, 45 * k, 12 * k, color);
-    sim.splat(0.65, 0.5 - drift, -45 * k, -12 * k, color);
+  function applyIdleBed(sim, f, k, palette, arc, T) {
+    if (arc.intensity > 0.45) return;
+    const drift = Math.sin(T * 0.23) * 0.06;
+    const amount = (1 - arc.intensity / 0.45) * k;
+    palette.colorAt(f.centroid, 0.012 * amount, color, arc.hueOffset);
+    sim.splat(0.38 + drift, 0.5 - drift * 0.5, 28 * amount, 9 * amount, color);
+    sim.splat(0.62 - drift, 0.5 + drift * 0.5, -28 * amount, -9 * amount, color);
   }
 
-  return { apply, reset, emitters };
+  return { apply, reset };
 }
