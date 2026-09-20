@@ -214,13 +214,25 @@ function describeSections(boundaries, fields, onsetTimes, n, frameRate) {
     levels.push(e / count);
   }
 
-  // Classify relative to the track, not an absolute level — a quiet song still has loud
-  // parts, and those should read as its drops.
+  /**
+   * Classify relative to the track, not an absolute level — a quiet song still has loud
+   * parts and those should read as its drops.
+   *
+   * The exception is material with no dynamics at all, where lo and hi collapse onto the
+   * same value and `energy >= hi` marks everything 'high'. On silence that produced a
+   * frozen screen: full intensity, zero drive, nothing drawn at all. An absolute floor
+   * catches it.
+   */
+  const SILENT = 0.02;
   const sorted = Float32Array.from(levels).sort();
   const q = (p) => sorted[Math.min(sorted.length - 1, Math.floor(p * (sorted.length - 1)))];
   const lo = q(0.35);
   const hi = q(0.7);
-  for (const s of sections) s.kind = s.energy >= hi ? 'high' : s.energy <= lo ? 'quiet' : 'mid';
+  const flat = hi - lo < 1e-4;
+  for (const s of sections) {
+    if (s.energy < SILENT || flat) s.kind = s.energy < SILENT ? 'quiet' : 'mid';
+    else s.kind = s.energy >= hi ? 'high' : s.energy <= lo ? 'quiet' : 'mid';
+  }
 
   return sections;
 }

@@ -136,9 +136,13 @@ export function createFlow(config, rng, system) {
    * is exactly what stops the loud ones from landing.
    */
   function applyIdleBed(sim, f, k, palette, arc, T) {
-    if (arc.intensity > 0.45) return;
+    // Keyed on the audio itself as well as the arc: intensity is derived, and if it is
+    // ever wrong (it was, on silence) the fallback that guarantees motion must not be
+    // disabled by the same mistake.
+    const quiet = Math.max(arc.intensity, f.activity * 1.4);
+    if (quiet > 0.45) return;
     const drift = Math.sin(T * 0.23) * 0.06;
-    const amount = (1 - arc.intensity / 0.45) * k;
+    const amount = (1 - quiet / 0.45) * k;
     palette.colorAt(f.centroid, 0.012 * amount, color, arc.hueOffset);
     sim.splat(0.38 + drift, 0.5 - drift * 0.5, 28 * amount, 9 * amount, color);
     sim.splat(0.62 - drift, 0.5 + drift * 0.5, -28 * amount, -9 * amount, color);

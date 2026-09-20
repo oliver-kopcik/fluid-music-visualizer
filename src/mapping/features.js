@@ -26,9 +26,20 @@ export function createFeatureReader() {
   const centroidSm = new OnePole(0.06, 0.5);
   const sustainSm = new OnePole(0.12);
 
-  // Centroid history, for the pitch-derivative steering term.
+  /**
+   * Centroid history for the pitch-derivative steering term, as a ring buffer.
+   *
+   * This was an array of {t, v} objects with a push and a shift every frame. One small
+   * object per frame is 60/sec of garbage for no reason, and it showed up as periodic
+   * 20ms+ GC pauses during a full-track pass. Two Float32Arrays and an index allocate
+   * nothing.
+   */
   const CENTROID_LAG = 0.1; // seconds
-  let centroidHistory = [];
+  const HISTORY = 64; // ample for 100ms even at very high frame rates
+  const histT = new Float32Array(HISTORY);
+  const histV = new Float32Array(HISTORY);
+  let histHead = 0;
+  let histCount = 0;
 
   const f = {
     t: 0,
@@ -48,7 +59,8 @@ export function createFeatureReader() {
   function reset() {
     for (const s of [bassFast, bassSlow, midSm, trebleFast, rmsSm, rmsSlow, sustainSm]) s.reset(0);
     centroidSm.reset(0.5);
-    centroidHistory = [];
+    histHead = 0;
+    histCount = 0;
   }
 
   /**
@@ -86,11 +98,22 @@ export function createFeatureReader() {
     // Rate of change of brightness over ~100ms. Rising lines sweep the flow outward,
     // falling lines pull it in; on a sustained lead this is what makes the motion track
     // the melody rather than just its loudness.
-    centroidHistory.push({ t, v: centroid });
-    while (centroidHistory.length > 2 && t - centroidHistory[0].t > CENTROID_LAG) centroidHistory.shift();
-    const oldest = centroidHistory[0];
-    const span = Math.max(1e-3, t - oldest.t);
-    f.centroidSlope = clamp((centroid - oldest.v) / span, -3, 3);
+    histT[histHead] = t;
+    histV[histHead] = centroid;
+    histHead = (histHead + 1) % HISTORY;
+    if (histCount < HISTORY) histCount++;
+
+    // Walk back to the most recent sample at least CENTROID_LAG old.
+    let refT = t;
+    let refV = centroid;
+    for (let k = 1; k < histCount; k++) {
+      const i = (histHead - 1 - k + HISTORY * 2) % HISTORY;
+      refT = histT[i];
+      refV = histV[i];
+      if (t - refT >= CENTROID_LAG) break;
+    }
+    const span = Math.max(1e-3, t - refT);
+    f.centroidSlope = clamp((centroid - refV) / span, -3, 3);
 
     f.beatPhase = timeline.beatPhaseAt(t);
     f.beatIndex = timeline.beatIndexAt(t);

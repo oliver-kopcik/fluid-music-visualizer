@@ -11,6 +11,16 @@ export const FFT_SIZE = 2048; // 42.7 ms window, 23.44 Hz per bin
 export const HOP = 400; // 48000 / 400 = 120 frames per second
 export const FRAME_RATE = 120;
 
+/**
+ * Seconds between an analysis frame's label and the audio it actually describes.
+ *
+ * Frame f covers samples [f*HOP, f*HOP + FFT_SIZE), so its centre of mass is half a
+ * window later than f/FRAME_RATE. Ignoring this reports every onset early — measured
+ * against synthesised kicks at known times, by about 33ms, which is a sixth of a beat at
+ * 120 BPM.
+ */
+export const FRAME_CENTER_OFFSET = FFT_SIZE / 2 / 48000;
+
 /** Band edges in Hz. Split finely enough that a kick and a hi-hat never share a band. */
 export const BANDS = {
   sub: [20, 60],

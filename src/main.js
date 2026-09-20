@@ -110,6 +110,14 @@ Object.defineProperty(window, 'timeline', { get: () => timeline });
 Object.defineProperty(window, 'mapping', { get: () => mapping });
 
 if (import.meta.env.DEV) {
+  window.synthTest = async (opts) => {
+    const m = await import('./dev/synthtest.js');
+    return m.synthTest(opts);
+  };
+  window.selfTest = async (opts) => {
+    const m = await import('./dev/selftest.js');
+    return m.selfTest(opts);
+  };
   window.checkDeterminism = async (opts) => {
     const m = await import('./dev/determinism.js');
     const result = await m.checkDeterminism(opts);

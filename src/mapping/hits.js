@@ -16,6 +16,8 @@ const MAX_SPLATS_PER_FRAME = 16;
 
 export function createHits(config, rng, system) {
   const color = { r: 0, g: 0, b: 0 };
+  // Reused scratch, so a busy passage does not allocate an array per frame.
+  const ordered = [];
   let sinceOnset = 999;
   let radiusBoost = 0;
   let bloomFlash = 0;
@@ -40,7 +42,9 @@ export function createHits(config, rng, system) {
     const baseForce = config.force ?? (f.profile === 'sparse' ? 1400 : 2400);
 
     // A dense hat pattern will otherwise wash the frame out within four bars.
-    const ordered = [...f.onsets].sort((a, b) => b.strength - a.strength);
+    ordered.length = 0;
+    for (let i = 0; i < f.onsets.length; i++) ordered.push(f.onsets[i]);
+    ordered.sort((a, b) => b.strength - a.strength);
     let budget = MAX_SPLATS_PER_FRAME;
 
     for (const onset of ordered) {

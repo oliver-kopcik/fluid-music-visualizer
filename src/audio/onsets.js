@@ -6,7 +6,7 @@
  * threshold either misses the intro or fires continuously through the drop.
  */
 import { percentile } from './normalize.js';
-import { FRAME_RATE } from './spectra.js';
+import { FRAME_RATE, FRAME_CENTER_OFFSET } from './spectra.js';
 
 export const DEFAULT_PARAMS = {
   delta: 1.6, // multiplier on the local median
@@ -114,7 +114,7 @@ export function detectOnsets(flux, params = {}) {
     const strength = Math.min(1, (flux[i] - threshold[i]) / spread);
     if (strength < p.minStrength) continue;
 
-    onsets.push({ frame: i, t: i / FRAME_RATE, strength });
+    onsets.push({ frame: i, t: i / FRAME_RATE + FRAME_CENTER_OFFSET, strength });
     lastFrame = i;
   }
 
@@ -132,12 +132,26 @@ export function mergeOnsets(low, high, full) {
     ...full.map((o) => ({ ...o, band: 'full' }))
   ].sort((a, b) => a.t - b.t);
 
-  // A kick usually also trips the full-band detector; keep the specific tag, drop the echo.
+  /**
+   * Collapse detections of the same hit, keeping the most informative label.
+   *
+   * The first version kept whichever arrived first, so a snare that also nudged the low
+   * detector was permanently relabelled a kick — on a synthesised backbeat, 100% of
+   * snares leaked into the low band and none were drawn as snares. A band-limited
+   * detector is only useful if its verdict survives the merge.
+   *
+   * Preference: a specific band beats 'full', and between 'low' and 'high' the stronger
+   * detection wins, since that is the band the energy actually landed in.
+   */
+  const rank = { full: 0, low: 1, high: 1 };
   const out = [];
   for (const o of tagged) {
     const prev = out[out.length - 1];
     if (prev && Math.abs(prev.t - o.t) < 0.03) {
-      if (prev.band === 'full' && o.band !== 'full') out[out.length - 1] = o;
+      const better =
+        rank[o.band] > rank[prev.band] ||
+        (rank[o.band] === rank[prev.band] && o.strength > prev.strength);
+      if (better) out[out.length - 1] = o;
       continue;
     }
     out.push(o);

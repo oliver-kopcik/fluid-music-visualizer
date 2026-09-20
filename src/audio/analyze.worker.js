@@ -6,6 +6,7 @@
  * exactly the kind of thing you notice.
  */
 import {
+  FRAME_CENTER_OFFSET,
   createSpectrogram,
   bandEnergyDb,
   spectralCentroid,
@@ -159,6 +160,27 @@ function analyze(samples, sampleRate, name, onProgress) {
   const full = detectOnsets(fluxNorm, { ...params, delta: params.delta * 1.25 });
   const onsets = mergeOnsets(low.onsets, high.onsets, full.onsets);
 
+  /**
+   * Re-label each onset by where the energy actually is, not by which flux moved most.
+   *
+   * Flux measures change, and the two bands have very different baselines. Between kicks
+   * the 30-130Hz band is silent, so a snare's small low-frequency content is an enormous
+   * *relative* jump, while the 2-10kHz band already has hats ringing and the same snare
+   * is a modest addition. Measured on a synthesised backbeat: at every snare, fluxLow was
+   * 17.0 against fluxHigh 2.1, and every single snare was drawn as a kick.
+   *
+   * Band energy does not have that problem — a kick has 30-130Hz energy and a snare does
+   * not, whatever either one does to the derivative. The band-limited detectors still
+   * decide *when* a hit happened; this decides what it was.
+   */
+  for (const o of onsets) {
+    const f = Math.min(n - 1, Math.max(0, Math.round((o.t - FRAME_CENTER_OFFSET) * FRAME_RATE)));
+    const lowEnergy = bands.sub[f] + bands.bass[f];
+    const highEnergy = bands.highMid[f] + bands.treble[f];
+    if (lowEnergy > highEnergy * 1.15) o.band = 'low';
+    else if (highEnergy > lowEnergy * 1.15) o.band = 'high';
+  }
+
   const tempo = estimateTempo(fluxNorm);
 
   /**
@@ -216,10 +238,11 @@ function analyze(samples, sampleRate, name, onProgress) {
   );
 
   return {
-    version: 10,
+    version: 12,
     ...structure,
     name,
     frameRate: FRAME_RATE,
+    frameCenterOffset: FRAME_CENTER_OFFSET,
     numFrames: n,
     duration: n / FRAME_RATE,
     profile,

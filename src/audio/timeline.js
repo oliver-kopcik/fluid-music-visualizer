@@ -15,13 +15,21 @@ export class Timeline {
   constructor(data) {
     Object.assign(this, data);
     this._cursor = 0;
+    // Onset records are consumed within the frame that produced them, so they can be
+    // pooled rather than allocated fresh each time one fires.
+    this._pool = [];
   }
 
-  /** Linear interpolation between adjacent analysis frames. */
+  /**
+   * Linear interpolation between adjacent analysis frames.
+   *
+   * Shifted by frameCenterOffset so continuous features and discrete onsets share one
+   * time base: a frame's label is half a window earlier than the audio it describes.
+   */
   sampleAt(field, t) {
     const arr = this[field];
     if (!arr || arr.length === 0) return 0;
-    const x = t * this.frameRate;
+    const x = (t - (this.frameCenterOffset ?? 0)) * this.frameRate;
     if (x <= 0) return arr[0];
     if (x >= arr.length - 1) return arr[arr.length - 1];
     const i = Math.floor(x);
@@ -54,12 +62,13 @@ export class Timeline {
     while (this._cursor < this.onsetTimes.length && this.onsetTimes[this._cursor] <= t) {
       const i = this._cursor;
       if (this.onsetTimes[i] > tPrev) {
-        out.push({
-          t: this.onsetTimes[i],
-          strength: this.onsetStrengths[i],
-          band: BAND_LABELS[this.onsetBands[i]],
-          index: i
-        });
+        let rec = this._pool[out.length];
+        if (!rec) rec = this._pool[out.length] = { t: 0, strength: 0, band: 'full', index: 0 };
+        rec.t = this.onsetTimes[i];
+        rec.strength = this.onsetStrengths[i];
+        rec.band = BAND_LABELS[this.onsetBands[i]];
+        rec.index = i;
+        out.push(rec);
       }
       this._cursor++;
     }
