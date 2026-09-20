@@ -1,6 +1,9 @@
 /**
  * FLOW — the continuous layer, riding the physical emitters.
  *
+ * The emitters never stop. What the music changes is how hard and how brightly each one
+ * pushes, not whether it exists.
+ *
  * Each emitter splats along its own motion: the velocity it injects is the direction it
  * is actually travelling, so the dye follows the emitter's path instead of being pushed
  * along a formula. When a kick throws the emitters outward, the dye is visibly thrown
@@ -60,14 +63,19 @@ export function createFlow(config, rng, system) {
   function emitRound(sim, f, palette, arc, aspect, bands, force, gate, dyeScale) {
 
     /**
-     * Dynamic range lives here. In a quiet section arc.intensity falls to ~0.2, most
-     * emitters drop below the gate, and the screen genuinely empties out — which is the
-     * only thing that makes the loud sections land.
+     * Every emitter emits on every round, always.
+     *
+     * Dynamic range used to come from switching emitters off: a count gated on
+     * arc.intensity, and a hard cutoff below which an emitter contributed nothing. That
+     * reads as the picture stopping and restarting rather than as the music getting
+     * quieter, and it made quiet passages look broken rather than calm. Volume now maps
+     * onto how far and how brightly each emitter pushes, continuously, with a floor that
+     * keeps a faint stir under silence. The loud sections still land, because the range
+     * between the floor and a full-level emitter is large.
      */
-    const active = Math.max(1, Math.round(system.emitters.length * (0.35 + 0.65 * arc.intensity)));
+    const floor = config.floor ?? 0.05;
 
     for (let i = 0; i < system.emitters.length; i++) {
-      if (i >= active) continue;
       const e = system.emitters[i];
 
       const band = bands[i % bands.length];
@@ -76,10 +84,9 @@ export function createFlow(config, rng, system) {
       // A held note keeps pushing even when nothing is attacking — without this a
       // drumless track goes still between phrases. e.energy carries recent hits, so an
       // emitter that was just struck keeps glowing for a moment.
-      const drive =
-        (Math.max(0, raw - gate) + (config.sustainDrive ?? 0.6) * f.sustain + e.energy * 0.5) *
-        arc.intensity;
-      if (drive <= 0.004) continue;
+      const level =
+        Math.max(0, raw - gate) + (config.sustainDrive ?? 0.6) * f.sustain + e.energy * 0.5;
+      const drive = floor + level * (0.35 + 0.65 * arc.intensity);
 
       // Direction of travel, not a formula. This is what ties the dye to the physics.
       let dx = e.x - e.prevX;
@@ -105,9 +112,10 @@ export function createFlow(config, rng, system) {
         Math.pow(clamp(drive, 0, 2), 1.3) *
         (0.6 + 1.1 * arc.intensity);
 
-      // Held deliberately low: six emitters at 60Hz is ~360 splats/sec, so each has to be
-      // far fainter than a mouse splat or the screen fills within a couple of seconds.
-      const dye = (0.012 + 0.05 * Math.pow(clamp01(drive), 0.8)) * (0.4 + 0.9 * arc.intensity) * dyeScale;
+      // Held deliberately low: six emitters at 60Hz is ~360 splats/sec, and they now run
+      // without pause, so each has to be far fainter than a mouse splat or the screen
+      // fills within a couple of seconds.
+      const dye = (0.006 + 0.05 * Math.pow(clamp01(drive), 0.8)) * (0.35 + 0.9 * arc.intensity) * dyeScale;
       palette.colorAt(clamp01(f.centroid + i * 0.03), dye, color, arc.hueOffset);
 
       sim.splat(e.x, e.y, rx * mag, ry * mag, color);

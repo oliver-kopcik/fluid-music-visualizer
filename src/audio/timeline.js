@@ -63,10 +63,12 @@ export class Timeline {
       const i = this._cursor;
       if (this.onsetTimes[i] > tPrev) {
         let rec = this._pool[out.length];
-        if (!rec) rec = this._pool[out.length] = { t: 0, strength: 0, band: 'full', index: 0 };
+        if (!rec) rec = this._pool[out.length] = { t: 0, strength: 0, band: 'full', index: 0, pitch: 0.5, noise: 0.5 };
         rec.t = this.onsetTimes[i];
         rec.strength = this.onsetStrengths[i];
         rec.band = BAND_LABELS[this.onsetBands[i]];
+        rec.pitch = this.onsetPitch?.[i] ?? 0.5;
+        rec.noise = this.onsetNoise?.[i] ?? 0.5;
         rec.index = i;
         out.push(rec);
       }

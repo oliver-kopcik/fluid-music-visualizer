@@ -171,6 +171,95 @@ export async function synthTest({ verbose = true } = {}) {
     );
   }
 
+  /**
+   * ---- 2b. pitch: three known sounds must land in the right registers ------------------
+   *
+   * The backbeat contains exactly three sounds at known times, so the thing the visuals
+   * are built from can be scored rather than eyeballed: a kick must measure lower than a
+   * snare, which must measure lower than a hat, and each must measure consistently. Get
+   * that wrong and every downstream property — height, width, force, colour — is wrong
+   * together, which is exactly what used to happen when a kick was clustered as a mid.
+   */
+  {
+    const sig = synth.backbeat({ bpm: 128, bars: 8 });
+    const tl = await analyse(sig.mono, 'synth-pitch');
+    const { shapeOf } = await import('../mapping/gesture.js');
+
+    const pitchesNear = (times, tol = 0.07) => {
+      const out = [];
+      for (let i = 0; i < tl.onsetTimes.length; i++) {
+        if (times.some((t) => Math.abs(tl.onsetTimes[i] - t) <= tol)) out.push(tl.onsetPitch[i]);
+      }
+      return out;
+    };
+    const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN);
+    const spread = (a) => {
+      if (a.length < 2) return 0;
+      const m = mean(a);
+      return Math.sqrt(a.reduce((x, y) => x + (y - m) ** 2, 0) / a.length);
+    };
+
+    const offbeat = [];
+    for (let b = 0; b < 32; b++) offbeat.push((b + 0.5) * (60 / 128));
+
+    const kp = pitchesNear(sig.kicks);
+    const sp = pitchesNear(sig.snares);
+    const hp = pitchesNear(offbeat);
+
+    check(
+      'pitch: kick reads lower than snare',
+      mean(kp) < mean(sp) - 0.15,
+      `kick ${mean(kp).toFixed(2)} vs snare ${mean(sp).toFixed(2)}`
+    );
+    check(
+      'pitch: snare reads no higher than the hat',
+      mean(sp) <= mean(hp) + 0.05,
+      `snare ${mean(sp).toFixed(2)} vs hat ${mean(hp).toFixed(2)}`
+    );
+    /**
+     * Consistency is what makes a recurring sound recognisable: the same drum has to
+     * measure the same every bar, or it moves around the frame and changes colour for no
+     * audible reason.
+     */
+    check(
+      'pitch: the same sound measures the same each time',
+      spread(kp) < 0.12 && spread(sp) < 0.2,
+      `kick sd ${spread(kp).toFixed(3)}, snare sd ${spread(sp).toFixed(3)}`
+    );
+    check(
+      'pitch: the full range is used',
+      Math.min(...tl.onsetPitch) < 0.1 && Math.max(...tl.onsetPitch) > 0.9,
+      `${Math.min(...tl.onsetPitch).toFixed(2)}–${Math.max(...tl.onsetPitch).toFixed(2)}`
+    );
+
+    // And the picture must follow: lower sound, lower on screen, wider and heavier.
+    const kShape = shapeOf(mean(kp), 0.5);
+    const sShape = shapeOf(mean(sp), 0.5);
+    check(
+      'pitch: low sounds are drawn lower',
+      kShape.y < sShape.y - 0.08,
+      `kick y=${kShape.y.toFixed(2)} vs snare y=${sShape.y.toFixed(2)}`
+    );
+    check(
+      'pitch: low sounds are drawn wider and heavier',
+      kShape.spread > sShape.spread && kShape.weight > sShape.weight,
+      `spread ${kShape.spread.toFixed(3)} vs ${sShape.spread.toFixed(3)}`
+    );
+    /**
+     * Smoothness is the property the whole design rests on, so it is asserted directly:
+     * no small change in pitch may produce a jump in where a hit is drawn. A bucketed
+     * mapping fails this at every boundary.
+     */
+    let biggestJump = 0;
+    let prev = shapeOf(0, 0.5);
+    for (let i = 1; i <= 200; i++) {
+      const cur = shapeOf(i / 200, 0.5);
+      biggestJump = Math.max(biggestJump, Math.hypot(cur.x - prev.x, cur.y - prev.y));
+      prev = cur;
+    }
+    check('pitch: the mapping is continuous', biggestJump < 0.02, `largest step ${biggestJump.toFixed(4)}`);
+  }
+
   // ---- 3. sweep: the centroid should track a known curve ------------------------------
   {
     const mono = synth.sineSweep(12, 200, 5000);

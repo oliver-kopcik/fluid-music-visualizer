@@ -25,6 +25,13 @@ const BANDS = [
   { field: 'sustain', color: '#ffd166' }
 ];
 
+/**
+ * Tick colour by the onset's pitch, on the same continuous scale the visuals use. Reading
+ * the ticks then answers the question you actually have while listening: is this hit being
+ * placed in the register it sounds like it is in.
+ */
+const pitchColor = (p) => `hsl(${260 - 260 * p} 85% 64%)`;
+
 export function createDebugOverlay(container) {
   const canvas = document.createElement('canvas');
   canvas.style.cssText =
@@ -62,6 +69,7 @@ export function createDebugOverlay(container) {
       const top = i * ROW_HEIGHT;
       drawCurveRow(ctx, timeline, row, t0, t1, xOf, top, w);
     });
+
 
     drawBandRow(ctx, timeline, t0, t1, xOf, ROWS.length * ROW_HEIGHT, w);
 
@@ -131,12 +139,15 @@ export function createDebugOverlay(container) {
     plot(values, row.color, 1.4);
 
     // Onset ticks, height by strength — the thing you actually check against your ears.
-    ctx.fillStyle = row.color;
+    // Coloured by pitch — violet at the bottom of the spectrum through to red at the top —
+    // so where a hit will be drawn is visible in the tick itself.
     for (let i = 0; i < timeline.onsetTimes.length; i++) {
       const ot = timeline.onsetTimes[i];
       if (ot < t0 || ot > t1) continue;
       const band = ['low', 'high', 'full'][timeline.onsetBands[i]];
       if (band !== row.band) continue;
+      const pitch = timeline.onsetPitch?.[i];
+      ctx.fillStyle = pitch === undefined ? row.color : pitchColor(pitch);
       const x = xOf(ot);
       const hgt = 6 + timeline.onsetStrengths[i] * 16;
       ctx.fillRect(x - 1, baseline - hgt, 2, hgt);

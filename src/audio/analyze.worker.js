@@ -21,6 +21,8 @@ import { normalizeRobust, scaleByP95, percentile } from './normalize.js';
 import { detectOnsets, mergeOnsets, DEFAULT_PARAMS } from './onsets.js';
 import { estimateTempo, CONFIDENCE_THRESHOLD } from './tempo.js';
 import { analyzeSections } from './sections.js';
+import { spectralFlatness, onsetPitches, rankNormalize } from './timbre.js';
+
 
 /**
  * Treble level below which we assume there is no drum kit.
@@ -68,6 +70,7 @@ function analyze(samples, sampleRate, name, onProgress) {
   const rmsDb = new Float32Array(n);
   const centroidHz = new Float32Array(n);
   const centroidNorm = new Float32Array(n);
+  const flatness = new Float32Array(n);
   const flux = new Float32Array(n);
   const fluxLow = new Float32Array(n);
   const fluxHigh = new Float32Array(n);
@@ -98,6 +101,7 @@ function analyze(samples, sampleRate, name, onProgress) {
     prevCentroid = spectralCentroid(mag, spec.centroidRange, sampleRate, FFT_SIZE, prevCentroid);
     centroidHz[f] = prevCentroid;
     centroidNorm[f] = normalizeCentroid(prevCentroid);
+    flatness[f] = spectralFlatness(mag, 4, half);
 
     // One pass fills curLog; the band-limited fluxes reuse it rather than re-logging.
     flux[f] = spectralFlux(mag, prevLog, curLog, fullRange);
@@ -184,6 +188,29 @@ function analyze(samples, sampleRate, name, onProgress) {
   const tempo = estimateTempo(fluxNorm);
 
   /**
+   * Two continuous numbers per onset, which are what the visuals are actually built from:
+   * where the sound sits in the spectrum, and how hard it hit. Everything about how a hit
+   * is drawn varies smoothly with these, so there is no bucket for a sound to fall into
+   * wrongly — the failure that made a kick look like a hi-hat whenever clustering split it.
+   */
+  const onsetPitch = rankNormalize(
+    onsetPitches(onsets, {
+      spectrum32,
+      spectrumBins: SPECTRUM_BINS,
+      rms: rmsNorm,
+      frameRate: FRAME_RATE,
+      numFrames: n,
+      frameCenterOffset: FRAME_CENTER_OFFSET
+    })
+  );
+  const onsetNoise = rankNormalize(
+    Float32Array.from(onsets, (o) => {
+      const f = Math.min(n - 1, Math.max(0, Math.round((o.t - FRAME_CENTER_OFFSET) * FRAME_RATE)));
+      return flatness[f];
+    })
+  );
+
+  /**
    * Autocorrelation confidence alone is not enough to trust a beat grid.
    *
    * The drumless lead scores 5.71 — well above the threshold — because its phrasing is
@@ -238,7 +265,7 @@ function analyze(samples, sampleRate, name, onProgress) {
   );
 
   return {
-    version: 12,
+    version: 13,
     ...structure,
     name,
     frameRate: FRAME_RATE,
@@ -272,7 +299,10 @@ function analyze(samples, sampleRate, name, onProgress) {
     downbeats: tempo.downbeats,
     onsetTimes: Float32Array.from(onsets, (o) => o.t),
     onsetStrengths: Float32Array.from(onsets, (o) => o.strength),
-    onsetBands: Uint8Array.from(onsets, (o) => (o.band === 'low' ? 0 : o.band === 'high' ? 1 : 2))
+    onsetBands: Uint8Array.from(onsets, (o) => (o.band === 'low' ? 0 : o.band === 'high' ? 1 : 2)),
+    onsetPitch,
+    onsetNoise,
+    flatness
   };
 }
 
