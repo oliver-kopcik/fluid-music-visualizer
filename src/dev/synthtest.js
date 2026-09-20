@@ -260,6 +260,59 @@ export async function synthTest({ verbose = true } = {}) {
     check('pitch: the mapping is continuous', biggestJump < 0.02, `largest step ${biggestJump.toFixed(4)}`);
   }
 
+  /**
+   * ---- 2c. envelope: two sounds that differ in nothing else ---------------------------
+   *
+   * Closed and open hi-hats from the identical noise generator. Pitch, noisiness and level
+   * cannot separate them, so if the envelope axis does not, they are drawn the same — the
+   * one thing the earlier clustering could do that a three-axis mapping could not.
+   */
+  {
+    const sig = synth.hatPair({ bpm: 120, bars: 8 });
+    const tl = await analyse(sig.mono, 'synth-envelope');
+    const { ringSecondsFor } = await import('../mapping/gesture.js');
+
+    const near = (times, field, tol = 0.06) => {
+      const out = [];
+      for (let i = 0; i < tl.onsetTimes.length; i++) {
+        if (times.some((t) => Math.abs(tl.onsetTimes[i] - t) <= tol)) out.push(tl[field][i]);
+      }
+      return out;
+    };
+    const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN);
+
+    const closedDecay = mean(near(sig.closed, 'onsetDecay'));
+    const openDecay = mean(near(sig.open, 'onsetDecay'));
+    const closedPitch = mean(near(sig.closed, 'onsetPitch'));
+    const openPitch = mean(near(sig.open, 'onsetPitch'));
+
+    check(
+      'envelope: an open hat is measured as ringing longer than a closed one',
+      openDecay > closedDecay + 0.2,
+      `closed ${closedDecay.toFixed(2)} vs open ${openDecay.toFixed(2)}`
+    );
+    /**
+     * The point of the axis is that it carries information the others do not, so the pair
+     * being close on pitch is part of what is being asserted, not an incidental detail.
+     */
+    check(
+      'envelope: the pair is not separable by pitch',
+      Math.abs(openPitch - closedPitch) < 0.3,
+      `closed ${closedPitch.toFixed(2)} vs open ${openPitch.toFixed(2)}`
+    );
+    check(
+      'envelope: only the open hat is drawn ringing',
+      ringSecondsFor(closedDecay) === 0 && ringSecondsFor(openDecay) > 0.1,
+      `closed ${ringSecondsFor(closedDecay).toFixed(2)}s vs open ${ringSecondsFor(openDecay).toFixed(2)}s`
+    );
+    /** Ring length has to vary smoothly too, or it is a bucket wearing a disguise. */
+    let biggestJump = 0;
+    for (let i = 1; i <= 200; i++) {
+      biggestJump = Math.max(biggestJump, Math.abs(ringSecondsFor(i / 200) - ringSecondsFor((i - 1) / 200)));
+    }
+    check('envelope: ring length is continuous', biggestJump < 0.05, `largest step ${biggestJump.toFixed(3)}s`);
+  }
+
   // ---- 3. sweep: the centroid should track a known curve ------------------------------
   {
     const mono = synth.sineSweep(12, 200, 5000);

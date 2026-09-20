@@ -91,6 +91,94 @@ export function onsetPitches(onsets, { spectrum32, spectrumBins, rms, frameRate,
 }
 
 /**
+ * How long each onset rings, in seconds scaled onto 0..1 over a 600ms cap.
+ *
+ * "Rings" means falling 20dB from its peak, not the third (-9.5dB) the first version used.
+ * A third is over too quickly to be what anyone means by a sound ringing: it put a closed
+ * hi-hat at 0.03 and an open one at 0.11, squeezing the entire interesting range into the
+ * bottom fifth of the scale. At -20dB the same pair measures 0.06 and 0.43.
+ *
+ * Crucially it is the sound's *own* contribution that has to fall, measured above whatever
+ * was already sounding in that band before it arrived. On a clean fixture the two are the
+ * same thing; on real music they are not, and measuring absolute level had 96% of onsets
+ * still ringing at the 600ms cap — not because anything rang, but because a mix never
+ * falls 20dB below a hit while the rest of the arrangement keeps playing underneath it.
+ *
+ * This is the axis pitch, loudness and noisiness cannot see: a closed hi-hat and an open
+ * one are the same noise at the same brightness and the same level, and differ in nothing
+ * but this. Without it they are drawn identically, which is wrong in a way no amount of
+ * tuning the other three could fix.
+ *
+ * Unlike pitch this is NOT ranked within the track. "Rings for 300ms" is a physical fact
+ * about the sound, not a comparison: a track made entirely of short hits should have
+ * nothing ringing in it, and ranking would hand the longest half of them a tail anyway.
+ *
+ * Measured on a band around the onset's own pitch rather than on broadband level. On the
+ * EDM track 31% of onsets never saw broadband level fall to a third inside the cap — not
+ * because they rang, but because the rest of the mix carried on underneath them, which
+ * would have made every kick in a busy drop read as ringing for the full 600ms.
+ *
+ * The peak is taken over a few frames after the onset rather than at the onset frame,
+ * because a real attack takes longer than one 8ms hop to reach full level — anchoring on
+ * the onset frame measures the rise as though it were the decay.
+ */
+const DECAY_BAND_HALFWIDTH = 3;
+
+export function onsetDecays(
+  onsets,
+  { spectrum32, spectrumBins, positions, frameRate, numFrames, frameCenterOffset, maxSeconds = 0.6 }
+) {
+  const out = new Float32Array(onsets.length);
+  const limit = Math.round(maxSeconds * frameRate);
+  const peakWindow = Math.max(1, Math.round(0.03 * frameRate));
+
+  for (let i = 0; i < onsets.length; i++) {
+    const t = onsets[i].t - frameCenterOffset;
+    const f = Math.min(numFrames - 1, Math.max(0, Math.round(t * frameRate)));
+
+    const centre = Math.round((positions?.[i] ?? 0.5) * (spectrumBins - 1));
+    const lo = Math.max(0, centre - DECAY_BAND_HALFWIDTH);
+    const hi = Math.min(spectrumBins - 1, centre + DECAY_BAND_HALFWIDTH);
+    const level = (g) => {
+      let sum = 0;
+      for (let b = lo; b <= hi; b++) sum += Math.pow(spectrum32[g * spectrumBins + b], 4);
+      return sum;
+    };
+
+    // What was already sounding in this band, taken as the quietest of the few frames
+    // before the attack so the onset's own rise cannot inflate it.
+    let baseline = Infinity;
+    for (let g = Math.max(0, f - 5); g <= Math.max(0, f - 2); g++) baseline = Math.min(baseline, level(g));
+    if (!Number.isFinite(baseline)) baseline = 0;
+
+    // Levels here are energy, so -20dB in amplitude is a factor of 100.
+    let peak = 0;
+    let peakAt = f;
+    for (let g = f; g <= Math.min(numFrames - 1, f + peakWindow); g++) {
+      const v = level(g) - baseline;
+      if (v > peak) {
+        peak = v;
+        peakAt = g;
+      }
+    }
+    if (peak <= 0) {
+      out[i] = 0;
+      continue;
+    }
+
+    let held = limit;
+    for (let g = peakAt; g <= Math.min(numFrames - 1, peakAt + limit); g++) {
+      if (level(g) - baseline < peak / 100) {
+        held = g - peakAt;
+        break;
+      }
+    }
+    out[i] = held / limit;
+  }
+  return out;
+}
+
+/**
  * Stretch values onto 0..1 by rank.
  *
  * Raw flux-weighted position lands in roughly 0.25-0.6 on real music, because no real

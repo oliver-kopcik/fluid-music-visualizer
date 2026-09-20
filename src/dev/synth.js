@@ -127,6 +127,50 @@ export function hat(gain = 0.35, seed = 11) {
   return shape(out, { attackMs: 0.8, releaseMs: 14 });
 }
 
+/**
+ * Open hi-hat: the same noise source as `hat`, ringing for 300ms instead of 12.
+ *
+ * Deliberately built from the identical generator so the pair differs in envelope and in
+ * nothing else. Pitch, noisiness and level cannot tell them apart, which is exactly the
+ * case the envelope axis exists to cover.
+ */
+export function openHat(gain = 0.3, seed = 17) {
+  const dur = Math.round(0.4 * SR);
+  const out = new Float32Array(dur);
+  const noise = brightNoise(dur, seed, 3);
+  for (let i = 0; i < dur; i++) {
+    out[i] = noise[i] * Math.exp(-(i / SR) / 0.11) * gain;
+  }
+  return shape(out, { attackMs: 0.8, releaseMs: 60 });
+}
+
+/**
+ * Kick on the beat, closed hat a quarter-beat later, open hat on the half.
+ *
+ * The kick is there so the track spans a real pitch range. Neither hat is allowed to land
+ * on it: the first version struck the closed hat together with the kick, and the kick's
+ * low end dragged that hat's measured pitch down so far that the pair separated on pitch
+ * — which would have let the test pass while proving nothing about envelope.
+ */
+export function hatPair({ bpm = 120, bars = 8 } = {}) {
+  const beat = 60 / bpm;
+  const beats = bars * 4;
+  const buf = new Float32Array(Math.round((beats * beat + 0.8) * SR));
+  const closed = [];
+  const open = [];
+  const kicks = [];
+  for (let b = 0; b < beats; b++) {
+    const at = Math.round(b * beat * SR);
+    addAt(buf, at, kick());
+    kicks.push(b * beat);
+    addAt(buf, at + Math.round(beat * 0.25 * SR), hat(0.3, 11 + b));
+    closed.push((b + 0.25) * beat);
+    addAt(buf, at + Math.round(beat * 0.5 * SR), openHat(0.3, 17 + b));
+    open.push((b + 0.5) * beat);
+  }
+  return { mono: buf, bpm, closed, open, kicks, beat };
+}
+
 /** Sustained chord. No transients at all — this is what `sparse` should detect. */
 export function pad(seconds, gain = 0.25, root = 220) {
   const n = Math.round(seconds * SR);

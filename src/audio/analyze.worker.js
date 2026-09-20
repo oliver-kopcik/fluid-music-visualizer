@@ -21,7 +21,7 @@ import { normalizeRobust, scaleByP95, percentile } from './normalize.js';
 import { detectOnsets, mergeOnsets, DEFAULT_PARAMS } from './onsets.js';
 import { estimateTempo, CONFIDENCE_THRESHOLD } from './tempo.js';
 import { analyzeSections } from './sections.js';
-import { spectralFlatness, onsetPitches, rankNormalize } from './timbre.js';
+import { spectralFlatness, onsetPitches, onsetDecays, rankNormalize } from './timbre.js';
 
 
 /**
@@ -188,21 +188,31 @@ function analyze(samples, sampleRate, name, onProgress) {
   const tempo = estimateTempo(fluxNorm);
 
   /**
-   * Two continuous numbers per onset, which are what the visuals are actually built from:
-   * where the sound sits in the spectrum, and how hard it hit. Everything about how a hit
-   * is drawn varies smoothly with these, so there is no bucket for a sound to fall into
-   * wrongly — the failure that made a kick look like a hi-hat whenever clustering split it.
+   * The continuous numbers the visuals are built from: where the sound sits in the
+   * spectrum, how noisy it is, and how long it rings — alongside the strength the detector
+   * already reports. Everything about how a hit is drawn varies smoothly with these, so
+   * there is no bucket for a sound to fall into wrongly, which is the failure that made a
+   * kick look like a hi-hat whenever clustering split it.
    */
-  const onsetPitch = rankNormalize(
-    onsetPitches(onsets, {
-      spectrum32,
-      spectrumBins: SPECTRUM_BINS,
-      rms: rmsNorm,
-      frameRate: FRAME_RATE,
-      numFrames: n,
-      frameCenterOffset: FRAME_CENTER_OFFSET
-    })
-  );
+  const rawPitch = onsetPitches(onsets, {
+    spectrum32,
+    spectrumBins: SPECTRUM_BINS,
+    rms: rmsNorm,
+    frameRate: FRAME_RATE,
+    numFrames: n,
+    frameCenterOffset: FRAME_CENTER_OFFSET
+  });
+  const onsetPitch = rankNormalize(rawPitch);
+  // Absolute, not ranked — see the note in onsetDecays. The raw pitch positions pick the
+  // band each decay is measured in, so they have to be read before ranking flattens them.
+  const onsetDecay = onsetDecays(onsets, {
+    spectrum32,
+    spectrumBins: SPECTRUM_BINS,
+    positions: rawPitch,
+    frameRate: FRAME_RATE,
+    numFrames: n,
+    frameCenterOffset: FRAME_CENTER_OFFSET
+  });
   const onsetNoise = rankNormalize(
     Float32Array.from(onsets, (o) => {
       const f = Math.min(n - 1, Math.max(0, Math.round((o.t - FRAME_CENTER_OFFSET) * FRAME_RATE)));
@@ -302,6 +312,7 @@ function analyze(samples, sampleRate, name, onProgress) {
     onsetBands: Uint8Array.from(onsets, (o) => (o.band === 'low' ? 0 : o.band === 'high' ? 1 : 2)),
     onsetPitch,
     onsetNoise,
+    onsetDecay,
     flatness
   };
 }

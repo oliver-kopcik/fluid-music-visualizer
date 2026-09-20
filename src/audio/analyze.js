@@ -9,7 +9,7 @@ import { cacheGet, cachePut } from '../util/idb.js';
 export async function analyzeTrack({ mono, name, sampleRate }, onProgress = () => {}) {
   // Key on content, not filename: renaming a file shouldn't invalidate it, and two copies
   // of the same track shouldn't be analysed twice.
-  const key = 'v16:' + contentKey(mono, name);
+  const key = 'v20:' + contentKey(mono, name);
 
   const cached = await cacheGet(key);
   if (cached) {
