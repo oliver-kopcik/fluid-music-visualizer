@@ -3,8 +3,8 @@
  *
  * The grid is optional: it makes the visuals land on bars for four-on-the-floor material,
  * and it is deliberately easy to reject. tempoConfidence below the threshold means the
- * mapping layer falls back to raw onsets — which is the right answer for a rubato vocal,
- * where a confidently wrong beat grid would look far worse than no grid at all.
+ * mapping layer falls back to raw onsets — which is the right answer for free-time or
+ * drumless material, where a confidently wrong grid looks far worse than none at all.
  */
 import { FRAME_RATE } from './spectra.js';
 

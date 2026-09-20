@@ -133,7 +133,7 @@ export function normalizeCentroid(hz) {
  * Log-compressed, half-wave-rectified spectral flux.
  *
  * The log compression is what makes this work on quiet material: a raw magnitude
- * difference is dominated by whatever is loudest, so a vocal onset under a sustained pad
+ * difference is dominated by whatever is loudest, so a soft attack under a sustained pad
  * barely registers, while log(1 + 100x) gives the quiet attack comparable weight.
  */
 export function spectralFlux(mag, prevLog, logBuf, [lo, hi]) {

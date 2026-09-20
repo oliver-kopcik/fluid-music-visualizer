@@ -18,7 +18,7 @@ export function createSimGUI(sim, { onScreenshot } = {}) {
   gui.add(sim.config, 'SIM_RESOLUTION', { 32: 32, 64: 64, 128: 128, 256: 256 })
     .name('sim resolution')
     .onFinishChange(set('SIM_RESOLUTION'));
-  gui.add(sim.config, 'DENSITY_DISSIPATION', 0, 4).name('density diffusion');
+  gui.add(sim.config, 'DENSITY_DISSIPATION', 0, 12).name('density diffusion');
   gui.add(sim.config, 'VELOCITY_DISSIPATION', 0, 4).name('velocity diffusion');
   gui.add(sim.config, 'PRESSURE', 0, 1).name('pressure');
   gui.add(sim.config, 'CURL', 0, 50).step(1).name('vorticity');

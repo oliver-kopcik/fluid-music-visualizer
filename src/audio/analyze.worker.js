@@ -16,7 +16,7 @@ import {
   BAND_NAMES,
   SPECTRUM_BINS
 } from './spectra.js';
-import { normalizeRobust, scaleByP95 } from './normalize.js';
+import { normalizeRobust, scaleByP95, percentile } from './normalize.js';
 import { detectOnsets, mergeOnsets, DEFAULT_PARAMS } from './onsets.js';
 import { estimateTempo, CONFIDENCE_THRESHOLD } from './tempo.js';
 
@@ -25,11 +25,11 @@ import { estimateTempo, CONFIDENCE_THRESHOLD } from './tempo.js';
  *
  * Hi-hats and cymbals are the loudest thing above 6 kHz in almost any kit, so a track with
  * nothing up there has no percussion to key the visuals off. Measured over the test set:
- * EDM 16.8, a mixed pop track 16.3, an unaccompanied vocal stem 1.3 — a 15 dB gap.
+ * EDM 16.8, a mixed pop track 16.3, a drumless instrumental lead 1.3 — a 15 dB gap.
  *
  * Bass level does NOT work as the discriminator, which is what this originally used: a
- * low male vocal fundamental sits in the same 30-130 Hz range as a kick, so a drumless
- * stem still produces ~2 low-band onsets/sec. Note these are raw FFT magnitude sums, not
+ * sustained lead's fundamental sits in the same 30-130 Hz range as a kick, so a drumless
+ * track still produces ~2 low-band onsets/sec. Note these are raw FFT magnitude sums, not
  * dBFS, hence the positive values.
  *
  * This is a heuristic on a continuous quantity, so presets can override `profile`.
@@ -163,10 +163,10 @@ function analyze(samples, sampleRate, name, onProgress) {
   /**
    * Autocorrelation confidence alone is not enough to trust a beat grid.
    *
-   * The vocal stem scores 5.71 — well above the threshold — because its phrasing is
+   * The drumless lead scores 5.71 — well above the threshold — because its phrasing is
    * periodic enough to autocorrelate, and it yields a confident 133 BPM that nothing
    * actually lands on. Phase coherence of the low-band onsets against that period is the
-   * check that catches it: EDM 0.30, mixed pop 0.15, vocal 0.007.
+   * check that catches it: EDM 0.24, mixed pop 0.12, drumless lead 0.02.
    *
    * A grid no hit lands on is worse than no grid, because the visuals would pulse against
    * the music instead of with it.
@@ -174,13 +174,33 @@ function analyze(samples, sampleRate, name, onProgress) {
   const kickCoherence = phaseCoherence(low.onsets, tempo.bpm);
   const gridUsable = tempo.confidence >= CONFIDENCE_THRESHOLD && kickCoherence >= 0.12;
 
-  // Sustain: energy that is not attack. Held vowels score high here and near zero on flux,
-  // which is what keeps an unaccompanied vocal moving between consonants.
+  /**
+   * A second centroid curve, stretched to this track's own range, for palette lookup.
+   *
+   * centroidNorm maps 200 Hz-6 kHz absolutely, which is right for comparing tracks but
+   * wrong for choosing colour: on the EDM track the middle 50% of frames fall between
+   * 0.545 and 0.769, so the palette only ever showed a narrow band of cyan. Equalising
+   * against the track's own p10/p90 spreads the same motion across the whole palette.
+   *
+   * The blend keeps some absolute anchoring, so a genuinely dark track still reads darker
+   * than a bright one instead of every track using the identical hue sweep.
+   */
+  const cLo = percentile(centroidNorm, 10);
+  const cHi = percentile(centroidNorm, 90);
+  const cSpan = Math.max(0.05, cHi - cLo);
+  const centroidPalette = new Float32Array(n);
+  for (let f = 0; f < n; f++) {
+    const stretched = Math.min(1, Math.max(0, (centroidNorm[f] - cLo) / cSpan));
+    centroidPalette[f] = 0.75 * stretched + 0.25 * centroidNorm[f];
+  }
+
+  // Sustain: energy that is not attack. A held note scores high here and near zero on
+  // flux, which is what keeps a drumless lead moving between its attacks.
   const sustain = new Float32Array(n);
   for (let f = 0; f < n; f++) sustain[f] = Math.max(0, Math.min(1, rmsNorm[f] - 0.5 * fluxNorm[f]));
 
   return {
-    version: 7,
+    version: 8,
     name,
     frameRate: FRAME_RATE,
     numFrames: n,
@@ -199,6 +219,7 @@ function analyze(samples, sampleRate, name, onProgress) {
     rmsDb,
     centroidHz,
     centroidNorm,
+    centroidPalette,
     flux: fluxNorm,
     fluxLow: fluxLowNorm,
     fluxHigh: fluxHighNorm,
