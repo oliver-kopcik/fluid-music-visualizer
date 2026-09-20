@@ -13,7 +13,7 @@ import { decodeForAnalysis, ANALYSIS_SAMPLE_RATE } from './audio/decode.js';
 import { analyzeTrack } from './audio/analyze.js';
 import { createPlayer } from './audio/player.js';
 import { createMapping } from './mapping/index.js';
-import { PRESETS, pickPreset } from './presets/index.js';
+import { PRESETS, DEFAULT_SIM, pickPreset } from './presets/index.js';
 
 const canvas = document.querySelector('canvas');
 const player = createPlayer();
@@ -27,7 +27,7 @@ let trackName = '';
 let presetChoice = 'auto';
 let seed = 0x5eed;
 
-const sim = createFluidSim(canvas, { rng: () => streams.rngSim(), initialSplats: 6 });
+const sim = createFluidSim(canvas, { rng: () => streams.rngSim(), initialSplats: 6, config: DEFAULT_SIM });
 sim.setSize(scaleByPixelRatio(canvas.clientWidth), scaleByPixelRatio(canvas.clientHeight));
 
 attachPointerInput(sim);

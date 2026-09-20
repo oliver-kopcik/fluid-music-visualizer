@@ -28,8 +28,24 @@ const base = {
     ranges: { curlMin: 18, curlMax: 48, radiusMin: 0.18, radiusMax: 0.34, densityQuiet: 7.5, densityLoud: 5.0, bloomBase: 0.29 }
   },
   color: { palette: 'auto' },
-  sim: { DYE_RESOLUTION: 1024, SIM_RESOLUTION: 128, COLORFUL: false, SHADING: true, BLOOM: true, SUNRAYS: true }
+  /**
+   * Bloom off by default.
+   *
+   * It was carried over from upstream, where splats are sparse and a glow around them
+   * reads as light. The field fills the frame with dye continuously, so the same glow
+   * spreads between neighbouring colours and softens exactly the structure the fluid is
+   * there to show. FEEL still drives BLOOM_INTENSITY every frame, so turning it back on
+   * from the panel gets the full modulation rather than a flat setting.
+   */
+  sim: { DYE_RESOLUTION: 1024, SIM_RESOLUTION: 128, COLORFUL: false, SHADING: true, BLOOM: false, SUNRAYS: true }
 };
+
+/**
+ * The simulation settings every preset starts from, so the picture before a track is
+ * loaded matches the one after. Exported rather than duplicated in main.js: a default
+ * written in two places is a default that will disagree with itself.
+ */
+export const DEFAULT_SIM = base.sim;
 
 function merge(name, label, patch) {
   return {
