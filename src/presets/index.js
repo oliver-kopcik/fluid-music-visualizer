@@ -25,7 +25,7 @@ const base = {
    */
   field: { readers: 12, force: 2400 },
   feel: {
-    ranges: { curlMin: 18, curlMax: 48, radiusMin: 0.18, radiusMax: 0.34, densityQuiet: 7.5, densityLoud: 5.0, bloomBase: 0.5 }
+    ranges: { curlMin: 18, curlMax: 48, radiusMin: 0.18, radiusMax: 0.34, densityQuiet: 7.5, densityLoud: 5.0, bloomBase: 0.29 }
   },
   color: { palette: 'auto' },
   sim: { DYE_RESOLUTION: 1024, SIM_RESOLUTION: 128, COLORFUL: false, SHADING: true, BLOOM: true, SUNRAYS: true }
@@ -45,7 +45,7 @@ function merge(name, label, patch) {
 export const PRESETS = {
   edm: merge('edm', 'EDM / club', {
     field: { readers: 14, force: 2600 },
-    feel: { ranges: { curlMax: 52, densityLoud: 4.5, bloomBase: 0.5 } },
+    feel: { ranges: { curlMax: 52, densityLoud: 4.5, bloomBase: 0.29 } },
     color: { palette: 'auto' }
   }),
 
@@ -53,13 +53,13 @@ export const PRESETS = {
   // the picture from being driven harder than the material warrants.
   lead: merge('lead', 'Drumless / lead', {
     field: { readers: 12, force: 1500 },
-    feel: { ranges: { curlMin: 14, curlMax: 38, densityQuiet: 8.5, densityLoud: 6.0, bloomBase: 0.4 } },
+    feel: { ranges: { curlMin: 14, curlMax: 38, densityQuiet: 8.5, densityLoud: 6.0, bloomBase: 0.23 } },
     color: { palette: 'auto' }
   }),
 
   ambient: merge('ambient', 'Ambient / slow', {
     field: { readers: 10, force: 1100 },
-    feel: { ranges: { curlMin: 10, curlMax: 28, densityQuiet: 9.0, densityLoud: 7.0, bloomBase: 0.35 } },
+    feel: { ranges: { curlMin: 10, curlMax: 28, densityQuiet: 9.0, densityLoud: 7.0, bloomBase: 0.2 } },
     color: { palette: 'auto' }
   }),
 

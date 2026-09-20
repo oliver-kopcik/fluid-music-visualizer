@@ -30,7 +30,7 @@ const LIMITS = {
   DENSITY_DISSIPATION: [0.5, 30],
   VELOCITY_DISSIPATION: [0.01, 1.6],
   PRESSURE: [0.3, 0.99],
-  BLOOM_INTENSITY: [0.1, 1.6],
+  BLOOM_INTENSITY: [0.05, 1.15],
   BLOOM_THRESHOLD: [0.2, 0.95],
   SUNRAYS_WEIGHT: [0.1, 2]
 };
@@ -44,7 +44,7 @@ export function createFeel(config) {
   const density = new OnePole(0.25, 1);
   const velocity = new OnePole(0.35, 0.2);
   const pressure = new OnePole(0.3, 0.8);
-  const bloom = new Envelope(0.02, 0.18, 0.8);
+  const bloom = new Envelope(0.02, 0.18, 0.45);
   const sunrays = new OnePole(0.25, 1);
 
   const patch = {};
@@ -55,7 +55,7 @@ export function createFeel(config) {
     density.reset(1);
     velocity.reset(0.2);
     pressure.reset(0.8);
-    bloom.reset(0.8);
+    bloom.reset(0.45);
     sunrays.reset(1);
   }
 
@@ -123,11 +123,25 @@ export function createFeel(config) {
       density.step(densBase * (1.1 - 0.3 * rmsSlow) * (1 + 0.5 * arc.coil) * (1 - 0.3 * arc.burst), dt)
     );
 
+    /**
+     * Every bloom term was tuned against a picture that no longer exists.
+     *
+     * The old layers splatted six emitters plus discrete hits; the field runs a dozen
+     * readers continuously, so far more dye is on screen at any moment and the same bloom
+     * setting glares where it used to glow. The terms used to sum to 2.15 at a drop —
+     * clamped to 1.6, against upstream's default of 0.8 — with the ceiling doing the
+     * tuning, which meant every loud passage arrived at exactly the same blown-out value
+     * and none of the modulation here could be seen at all. They now sum to about 0.43
+     * typically and 1.14 at the loudest, so the ceiling is a safety limit again rather
+     * than the thing setting the look.
+     */
     patch.BLOOM_INTENSITY = limit(
       'BLOOM_INTENSITY',
-      bloom.step(bloomBase + 0.35 * rms * arc.intensity + bloomFlash + 0.45 * arc.burst, dt)
+      bloom.step(bloomBase + 0.18 * rms * arc.intensity + 0.5 * bloomFlash + 0.22 * arc.burst, dt)
     );
-    patch.BLOOM_THRESHOLD = limit('BLOOM_THRESHOLD', 0.6 + 0.1 * rms);
+    // Rises with level, so a loud passage blooms only its brightest cores rather than
+    // lighting the whole frame.
+    patch.BLOOM_THRESHOLD = limit('BLOOM_THRESHOLD', 0.68 + 0.14 * rms);
     patch.SUNRAYS_WEIGHT = limit(
       'SUNRAYS_WEIGHT',
       sunrays.step(sunBase * (0.7 + 0.5 * clamp01(f.centroid)), dt)
