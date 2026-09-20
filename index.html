@@ -109,6 +109,150 @@
       .status.error {
         color: #ff7a7a;
       }
+      .transport {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 6;
+        background: linear-gradient(to top, rgba(6, 7, 10, 0.92), rgba(6, 7, 10, 0));
+        padding: 22px 14px 10px;
+        color: #d8dde3;
+        font-size: 12px;
+        transition: opacity 0.4s ease, transform 0.4s ease;
+      }
+      .transport.idle {
+        opacity: 0;
+        transform: translateY(10px);
+        pointer-events: none;
+      }
+
+      .tp-scrub {
+        position: relative;
+        height: 16px;
+        cursor: pointer;
+        margin-bottom: 8px;
+      }
+      .tp-sections,
+      .tp-played {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 6px;
+        height: 5px;
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .tp-sections {
+        background: rgba(255, 255, 255, 0.12);
+      }
+      /* Section spans, coloured by the atmosphere each was assigned. */
+      .tp-sec {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        opacity: 0.75;
+        border-right: 1px solid rgba(0, 0, 0, 0.55);
+      }
+      /* Dims what has NOT played yet. Overlaying the played part instead washed the
+         section colours out, which are the whole point of the bar. */
+      .tp-played {
+        left: auto;
+        right: 0;
+        background: rgba(6, 7, 10, 0.62);
+        pointer-events: none;
+      }
+      .tp-head {
+        position: absolute;
+        top: 2px;
+        width: 2px;
+        height: 13px;
+        margin-left: -1px;
+        background: #fff;
+        border-radius: 1px;
+        pointer-events: none;
+        box-shadow: 0 0 6px rgba(255, 255, 255, 0.7);
+      }
+      .tp-scrub:hover .tp-sections,
+      .tp-scrub:hover .tp-played {
+        top: 4px;
+        height: 9px;
+      }
+
+      .tp-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .tp-btn {
+        border: 1px solid #2a2f37;
+        background: #14171c;
+        color: #e8ebef;
+        border-radius: 7px;
+        padding: 5px 11px;
+        font: inherit;
+        cursor: pointer;
+        line-height: 1.2;
+      }
+      .tp-btn:hover {
+        background: #1d222a;
+      }
+      .tp-play {
+        min-width: 38px;
+      }
+      .tp-time {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: #9aa3ad;
+        font-variant-numeric: tabular-nums;
+      }
+      .tp-title {
+        max-width: 26ch;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: #aeb6bf;
+      }
+      .tp-spacer {
+        flex: 1;
+      }
+      .tp-badge {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 11px;
+        color: #7f8894;
+        border: 1px solid #23272e;
+        border-radius: 6px;
+        padding: 3px 7px;
+        white-space: nowrap;
+      }
+      .tp-field {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        color: #7f8894;
+        font-size: 11px;
+      }
+      .tp-field select {
+        background: #14171c;
+        color: #e8ebef;
+        border: 1px solid #2a2f37;
+        border-radius: 6px;
+        padding: 4px 6px;
+        font: inherit;
+        font-size: 11px;
+      }
+      .tp-vol input {
+        width: 70px;
+        accent-color: #6ea8ff;
+      }
+
+      @media (max-width: 720px) {
+        .tp-title,
+        .tp-vol {
+          display: none;
+        }
+      }
+
       .keys {
         position: fixed;
         left: 12px;
@@ -124,7 +268,7 @@
   </head>
   <body>
     <canvas></canvas>
-    <div class="keys">space play/pause · D analysis · O open · ←/→ seek</div>
+    <div class="keys">space play/pause · D analysis · C clear · drag to splat</div>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

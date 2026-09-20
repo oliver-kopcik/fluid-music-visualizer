@@ -5,6 +5,7 @@ import { renderFrame } from './app/frame.js';
 import { createSimGUI } from './ui/gui.js';
 import { createTrackPicker } from './ui/trackPicker.js';
 import { createDebugOverlay } from './ui/debugOverlay.js';
+import { createTransport } from './ui/transport.js';
 import { captureScreenshot } from './export/screenshot.js';
 import { makeStreams } from './util/rng.js';
 import { decodeForAnalysis, ANALYSIS_SAMPLE_RATE } from './audio/decode.js';
@@ -21,6 +22,8 @@ let streams = makeStreams(0x5eed);
 let timeline = null;
 let mapping = null;
 let preset = null;
+let trackName = '';
+let presetChoice = 'auto';
 
 const sim = createFluidSim(canvas, { rng: () => streams.rngSim(), initialSplats: 6 });
 sim.setSize(scaleByPixelRatio(canvas.clientWidth), scaleByPixelRatio(canvas.clientHeight));
@@ -31,19 +34,39 @@ const gui = createSimGUI(sim, {
   getMapping: () => mapping
 });
 
-const frameCtx = { mapping: null, features: { live: null }, interactive: true };
+// `playing` gates the mapping: once a track ends it must stop driving, or the idle bed
+// keeps circling forever. See the liveness note in mapping/index.js.
+// `playing` lives inside `features` because that is what renderFrame forwards to the
+// mapping. Putting it on the outer object meant it never arrived.
+const frameCtx = { mapping: null, features: { live: null, playing: true }, interactive: true };
 let lastTime = 0;
 
-function applyPreset(next) {
+function buildMapping(at = 0) {
+  if (!timeline) return;
+  mapping = createMapping({ timeline, preset, rng: streams.rngMap });
+  mapping.reset(at);
+  frameCtx.mapping = mapping;
+}
+
+function applyPreset(next, { rebuild = true } = {}) {
   preset = next;
   sim.setConfig(preset.sim);
-  if (timeline) {
-    mapping = createMapping({ timeline, preset, rng: streams.rngMap });
-    mapping.reset(player.currentTime);
-    frameCtx.mapping = mapping;
-  }
+  if (rebuild) buildMapping(player.currentTime);
   gui.controllers.forEach((c) => c.updateDisplay());
 }
+
+const transport = createTransport(document.body, {
+  player,
+  getMapping: () => mapping,
+  onOpen: () => picker.show(),
+  onPreset: (name) => {
+    presetChoice = name;
+    applyPreset(name === 'auto' ? pickPreset(timeline) : PRESETS[name]);
+    transport.setTrack(trackName, mapping);
+  },
+  onPalette: (name) => mapping?.setPalette(name),
+  onAtmosphere: (name) => mapping?.forceAtmosphere(name)
+});
 
 const picker = createTrackPicker(document.body, {
   async onLoad(fileOrUrl, name, setStatus) {
@@ -56,14 +79,19 @@ const picker = createTrackPicker(document.body, {
     );
 
     timeline = result.timeline;
+    trackName = name;
     // Seed from audio content, so the same track always renders the same way.
     streams = makeStreams(result.seed);
 
-    applyPreset(pickPreset(timeline));
+    applyPreset(presetChoice === 'auto' ? pickPreset(timeline) : PRESETS[presetChoice], { rebuild: false });
+    buildMapping(0);
     sim.clear();
 
     player.load(decoded.buffer);
     await player.play();
+
+    transport.setPreset(presetChoice);
+    transport.setTrack(name, mapping);
 
     console.log(
       `${name}: ${timeline.duration.toFixed(1)}s · ${timeline.onsetTimes.length} onsets · ` +
@@ -77,14 +105,16 @@ const picker = createTrackPicker(document.body, {
 const loop = createLoop(sim, (dt) => {
   const t = timeline ? player.currentTime : lastTime + dt;
   lastTime = t;
+  frameCtx.features.playing = player.playing;
   renderFrame(sim, frameCtx, t, dt);
   overlay.draw(timeline, t);
+  transport.update();
 });
 
 sim.ready.then(() => loop.start());
 
 window.addEventListener('keydown', (e) => {
-  if (e.target instanceof HTMLInputElement) return;
+  if (e.target instanceof HTMLInputElement || e.target instanceof HTMLSelectElement) return;
   if (e.code === 'KeyP') sim.setConfig({ PAUSED: !sim.config.PAUSED });
   if (e.code === 'KeyD') overlay.toggle();
   if (e.code === 'KeyO') picker.show();

@@ -144,6 +144,8 @@ export function createFlow(config, rng, system) {
     // disabled by the same mistake.
     const quiet = Math.max(arc.intensity, f.activity * 1.4);
     if (quiet > 0.45) return;
+    // The bed is for quiet *passages*, not for after the track has finished.
+    if ((arc.liveness ?? 1) < 0.5) return;
     const drift = Math.sin(T * 0.23) * 0.06;
     const amount = (1 - quiet / 0.45) * k;
     palette.colorAt(f.centroid, 0.012 * amount, color, arc.hueOffset);

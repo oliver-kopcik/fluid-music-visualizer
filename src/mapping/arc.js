@@ -33,14 +33,28 @@ export function createArc(atmosphereIndex) {
   const formation = {};
   const atmosphere = {};
 
+  /** When set, overrides the per-section choice so one atmosphere can be auditioned. */
+  let forced = null;
+
   let prevAtmos = nameFor(0);
   let curAtmos = nameFor(0);
   let fade = 1;
 
   function nameFor(sectionIdx) {
+    if (forced) return forced;
     if (!atmosphereIndex || !atmosphereIndex.length) return 'aurora';
     const i = Math.min(atmosphereIndex.length - 1, Math.max(0, sectionIdx));
     return ATMOSPHERE_NAMES[atmosphereIndex[i]] ?? 'aurora';
+  }
+
+  function force(name) {
+    forced = name || null;
+    const next = nameFor(state.sectionIndex);
+    if (next !== curAtmos) {
+      prevAtmos = curAtmos;
+      curAtmos = next;
+      fade = 0;
+    }
   }
 
   const state = {
@@ -58,6 +72,8 @@ export function createArc(atmosphereIndex) {
     sectionIndex: -1,
     sectionKind: 'mid',
     justChangedSection: false,
+    /** 0..1, driven down when playback stops so the picture settles. */
+    liveness: 1,
     /** Blended simulation character for this moment. See atmospheres.js. */
     atmosphere,
     atmosphereName: 'aurora'
@@ -148,5 +164,5 @@ export function createArc(atmosphereIndex) {
     return state;
   }
 
-  return { update, reset, state };
+  return { update, reset, force, state };
 }

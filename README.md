@@ -21,7 +21,7 @@ npm run dev          # http://localhost:5173
 | M4b · Arc, atmospheres, test suites | done |
 | M5 · Quick WebM export | |
 | M6 · Deterministic MP4 export | |
-| M7 · UI polish | |
+| M7 · Transport + preset/palette/atmosphere selectors | done |
 
 ## Tests
 
@@ -40,10 +40,30 @@ found four real bugs, including onsets reported 33ms early and every snare being
 a kick. It also validates its own fixtures first, having been misled by a "hi-hat"
 filtered at 306Hz.
 
-## Audio
+## Using it
 
 Drag a file onto the window, or drop audio into `music/` and restart the dev server for a
 quick-pick menu. **`music/` is gitignored** — no audio is ever committed.
+
+A transport bar sits at the bottom and fades out while the mouse is still. Its seek bar is
+**segmented by section and coloured by the atmosphere each one was assigned**, so the shape
+of the track is visible at a glance and clicking a segment jumps straight to it — which is
+the practical way to compare one atmosphere against another. The badge shows the current
+atmosphere and posture; the dropdowns override preset, palette and atmosphere (`auto`
+hands each back to the analysis).
+
+| key | |
+|---|---|
+| `space` | play / pause |
+| `←` `→` | seek ∓5s |
+| `D` | analysis overlay: flux, thresholds, onset ticks, beat grid |
+| `O` | open another track |
+| `C` | clear the dye |
+| `P` | freeze the simulation (not the audio) |
+
+Drag on the canvas to splat by hand, at any time. The **Simulation** panel top-right
+(click to expand) exposes the raw fluid parameters; everything the mapping drives updates
+live, so you can watch velocity diffusion and vorticity move on their own.
 
 ## Layout
 

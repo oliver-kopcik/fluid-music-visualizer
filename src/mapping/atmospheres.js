@@ -37,6 +37,7 @@
  * @property bloom     BLOOM_INTENSITY base.
  * @property sunrays   SUNRAYS_WEIGHT.
  * @property palette   colour identity.
+ * @property swatch    representative colour, used by the seek bar to show structure.
  * @property flowForce multiplier on FLOW's push.
  */
 export const ATMOSPHERES = {
@@ -53,6 +54,7 @@ export const ATMOSPHERES = {
     sunrays: 0.4,
     palette: 'ember',
     flowForce: 0.85,
+    swatch: '#c2632a',
     want: { weight: 1, sustain: 0.5, onsetRate: -0.6, brightness: -0.8 }
   },
 
@@ -69,6 +71,7 @@ export const ATMOSPHERES = {
     sunrays: 1.3,
     palette: 'ice',
     flowForce: 0.9,
+    swatch: '#3f9fc9',
     want: { sustain: 1.2, onsetRate: -1, busyness: -0.7 }
   },
 
@@ -85,6 +88,7 @@ export const ATMOSPHERES = {
     sunrays: 1.5,
     palette: 'spectral',
     flowForce: 1,
+    swatch: '#7bc8a4',
     want: { brightness: 1.1, weight: -0.7, energy: 0.2 }
   },
 
@@ -101,6 +105,7 @@ export const ATMOSPHERES = {
     sunrays: 0.7,
     palette: 'neon',
     flowForce: 1.15,
+    swatch: '#c556d6',
     want: { onsetRate: 1.2, busyness: 1, sustain: -0.8 }
   },
 
@@ -117,6 +122,7 @@ export const ATMOSPHERES = {
     sunrays: 1.1,
     palette: 'sunset',
     flowForce: 1.3,
+    swatch: '#e0913a',
     want: { energy: 1.3, weight: 0.6, brightness: 0.4 }
   },
 
@@ -133,6 +139,7 @@ export const ATMOSPHERES = {
     sunrays: 0.9,
     palette: 'ice',
     flowForce: 0.6,
+    swatch: '#41567a',
     want: { energy: -1.5, busyness: -0.5 }
   }
 };

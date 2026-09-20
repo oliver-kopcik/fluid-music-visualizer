@@ -9,13 +9,14 @@
  * then HITS (which shove the emitters and may bump the radius further), then FLOW.
  */
 import { createFeatureReader } from './features.js';
+import { Envelope } from './smoothers.js';
 import { createEmitterSystem } from './emitters.js';
 import { createArc } from './arc.js';
 import { createFlow } from './flow.js';
 import { createHits } from './hits.js';
 import { createFeel } from './feel.js';
 import { createPalette, createBlendedPalette } from '../color/palettes.js';
-import { assignAtmospheres, ATMOSPHERES } from './atmospheres.js';
+import { assignAtmospheres, ATMOSPHERES, ATMOSPHERE_NAMES } from './atmospheres.js';
 
 export function createMapping({ timeline, preset, rng }) {
   const reader = createFeatureReader();
@@ -27,17 +28,32 @@ export function createMapping({ timeline, preset, rng }) {
   const flow = createFlow(preset.flow ?? {}, rng, system);
   const hits = createHits(preset.hits ?? {}, rng, system);
   const feel = createFeel(preset.feel ?? {});
-  // The atmosphere owns colour identity; an explicit preset palette overrides it, and
-  // 'random' keeps upstream's behaviour.
-  const fixedPalette = preset.color?.palette && preset.color.palette !== 'auto'
-    ? createPalette(preset.color.palette, rng)
-    : null;
+  /**
+   * The atmosphere owns colour identity unless something overrides it.
+   *
+   * Held as a name rather than a built palette so the UI can change it mid-playback; the
+   * first version resolved this once at construction and setPalette silently did nothing.
+   */
+  let overrideName = preset.color?.palette && preset.color.palette !== 'auto' ? preset.color.palette : null;
+  let fixedPalette = overrideName ? createPalette(overrideName, rng) : null;
   let blended = createBlendedPalette('spectral', 'spectral', rng);
   let paletteFrom = null;
   let paletteTo = null;
 
   let tPrev = 0;
   let lastTransients = { radiusBoost: 0, bloomFlash: 0 };
+
+  /**
+   * How much the visuals should be driven right now, 0..1.
+   *
+   * Once a track ends, currentTime clamps to the duration and the mapping would otherwise
+   * go on reading that final frame forever. The idle bed exists so silence reads as calm
+   * rather than frozen, but it fires whenever activity is low — which after the end of a
+   * track is always — so two splats kept circling indefinitely on any track not ending in
+   * a loud section. Winding this down when playback stops lets the picture settle and the
+   * dye dissipate, and it comes straight back on resume.
+   */
+  const liveness = new Envelope(0.25, 1.2, 1);
 
   /**
    * Seconds of lookahead applied when sampling the timeline. Positive makes the visuals
@@ -86,7 +102,34 @@ export function createMapping({ timeline, preset, rng }) {
     },
     /** Pass 'auto' to hand colour back to the atmospheres. */
     setPalette(name) {
-      preset.color = { ...preset.color, palette: name };
+      overrideName = !name || name === 'auto' ? null : name;
+      fixedPalette = overrideName ? createPalette(overrideName, rng) : null;
+      preset.color = { ...preset.color, palette: name || 'auto' };
+    },
+    get paletteOverride() {
+      return overrideName;
+    },
+
+    /** Force one atmosphere everywhere, or pass null to follow the sections again. */
+    forceAtmosphere(name) {
+      arc.force(name);
+    },
+
+    /** Section spans plus their chosen atmosphere, for the seek bar. */
+    get sections() {
+      const bounds = timeline.sectionBounds ?? [];
+      const out = [];
+      for (let i = 0; i < (timeline.sectionCount ?? 0); i++) {
+        const name = ATMOSPHERE_NAMES[atmosphereIndex[i]] ?? 'aurora';
+        out.push({
+          index: i,
+          start: bounds[i] ?? 0,
+          end: bounds[i + 1] ?? timeline.duration,
+          atmosphere: name,
+          swatch: ATMOSPHERES[name]?.swatch ?? '#666'
+        });
+      }
+      return out;
     },
 
     get syncOffset() {
@@ -126,6 +169,18 @@ export function createMapping({ timeline, preset, rng }) {
       tPrev = tRead;
 
       const a = arc.update(readArc(tRead), dt);
+
+      /**
+       * Defaults to driving. Only an explicit `playing: false` winds it down, so headless
+       * callers — the test suites, and the offline renderer — work without having to know
+       * about playback state at all. Getting this backwards silently gated off every
+       * splat, including in the tests.
+       */
+      const live = liveness.step(ctxFeatures?.playing === false ? 0 : 1, dt);
+      a.liveness = live;
+      a.intensity *= live;
+      // Below this nothing is visible anyway; stop drawing so the fluid can settle.
+      if (live < 0.02) return f;
 
       // Rebuild the cross-fade only when the atmosphere pair actually changes; setMix is
       // the per-frame part and is free.
