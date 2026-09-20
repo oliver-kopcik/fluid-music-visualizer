@@ -121,9 +121,17 @@
         font-size: 12px;
         transition: opacity 0.4s ease, transform 0.4s ease;
       }
-      .transport.idle {
+      /* The transport, the key hints and the simulation panel fade together, driven by one
+         timer on <body>. Hiding only the transport left the other two floating over the
+         picture, which is the thing they are all meant to get out of the way of. */
+      body.ui-idle .transport {
         opacity: 0;
         transform: translateY(10px);
+        pointer-events: none;
+      }
+      body.ui-idle .keys,
+      body.ui-idle .lil-gui.root {
+        opacity: 0;
         pointer-events: none;
       }
 
@@ -429,6 +437,10 @@
         font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
         pointer-events: none;
         z-index: 4;
+      }
+      .keys,
+      .lil-gui.root {
+        transition: opacity 0.4s ease;
       }
     </style>
   </head>

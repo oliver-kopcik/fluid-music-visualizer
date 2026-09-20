@@ -7,7 +7,9 @@
  * the only practical way to audition one atmosphere against another.
  *
  * Auto-hides while the mouse is still, because this is a visualizer and the picture
- * should not be permanently occluded by a toolbar.
+ * should not be permanently occluded by a toolbar. The timer lives here but the state
+ * goes on <body>, so the key hints and the simulation panel fade with it — they are the
+ * same decision, and running three timers would let them drift apart on screen.
  */
 import { PRESETS } from '../presets/index.js';
 import { PALETTE_NAMES } from '../color/palettes.js';
@@ -114,12 +116,25 @@ export function createTransport(container, { player, getMapping, onPreset, onPal
 
   // --- auto-hide -------------------------------------------------------------------
   let idleTimer = null;
+
+  /**
+   * Never hide anything the pointer is resting on or focused in.
+   *
+   * Hover counts as well as focus: reading a value off the simulation panel means holding
+   * still over it, which is exactly what the idle timer is waiting for, and the panel
+   * would vanish from under the cursor.
+   */
+  const inUse = () => {
+    if (scrubbing) return true;
+    if (document.activeElement?.closest?.('.transport, .lil-gui')) return true;
+    return !!document.querySelector('.transport:hover, .lil-gui.root:hover');
+  };
+
   const wake = () => {
-    root.classList.remove('idle');
+    document.body.classList.remove('ui-idle');
     clearTimeout(idleTimer);
     idleTimer = setTimeout(() => {
-      // Never hide while someone is actually using it.
-      if (!scrubbing && !root.contains(document.activeElement)) root.classList.add('idle');
+      if (!inUse()) document.body.classList.add('ui-idle');
     }, IDLE_MS);
   };
   window.addEventListener('pointermove', wake);
