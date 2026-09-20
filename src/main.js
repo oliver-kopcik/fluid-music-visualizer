@@ -80,7 +80,7 @@ const transport = createTransport(document.body, {
 
 const picker = createTrackPicker(document.body, {
   async onLoad(fileOrUrl, name, setStatus) {
-    const decoded = await decodeForAnalysis(fileOrUrl);
+    const decoded = await decodeForAnalysis(fileOrUrl, (notice) => setStatus(notice));
     setStatus('Analysing…');
 
     const result = await analyzeTrack(

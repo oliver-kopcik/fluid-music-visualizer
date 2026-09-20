@@ -143,10 +143,13 @@ function analyze(samples, sampleRate, name, onProgress) {
    */
   const spectrumReference = new Float32Array(SPECTRUM_BINS);
   {
-    const column = new Float32Array(n);
+    // Sampled for the same reason as riseReference below.
+    const stride = Math.max(1, Math.ceil(n / 20000));
+    const column = new Float32Array(Math.ceil(n / stride));
     for (let b = 0; b < SPECTRUM_BINS; b++) {
-      for (let f = 0; f < n; f++) column[f] = spectrum32[f * SPECTRUM_BINS + b];
-      spectrumReference[b] = percentile(column, 95);
+      let k = 0;
+      for (let f = 0; f < n; f += stride) column[k++] = spectrum32[f * SPECTRUM_BINS + b];
+      spectrumReference[b] = percentile(column.subarray(0, k), 95);
     }
     for (let pass = 0; pass < 3; pass++) smooth3InPlace(spectrumReference);
     let loudest = 0;
@@ -230,12 +233,21 @@ function analyze(samples, sampleRate, name, onProgress) {
   let riseReference = 1;
   {
     const step = Math.max(1, Math.round(FRAME_RATE / 60));
-    const rises = new Float32Array(Math.max(1, (n - step) * SPECTRUM_BINS));
+    /**
+     * Sampled rather than exhaustive. A percentile needs a representative sample, not
+     * every value, and an hour-long mix has 13 million of them — collecting and sorting
+     * those costs 50MB and seconds of work to arrive at the same number a few hundred
+     * thousand give. The stride is spread over the whole track so a loud opening cannot
+     * stand in for the rest of it.
+     */
+    const stride = Math.max(1, Math.ceil((n - step) / 8000));
+    const sampled = Math.max(1, Math.ceil((n - step) / stride)) * SPECTRUM_BINS;
+    const rises = new Float32Array(sampled);
     let count = 0;
-    for (let f = step; f < n; f++) {
+    for (let f = step; f < n; f += stride) {
       for (let b = 0; b < SPECTRUM_BINS; b++) {
         const gain = 1 / Math.max(1e-6, spectrumReference[b]);
-        const d = spectrum32[f * SPECTRUM_BINS + b] * gain - spectrum32[(f - step) * SPECTRUM_BINS + b] * gain;
+        const d = (spectrum32[f * SPECTRUM_BINS + b] - spectrum32[(f - step) * SPECTRUM_BINS + b]) * gain;
         if (d > 0) rises[count++] = d;
       }
     }
