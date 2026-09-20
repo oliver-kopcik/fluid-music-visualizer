@@ -37,6 +37,35 @@ const REFERENCE_DT = 1 / 60;
  */
 const RISE_DELTA = 1 / 60;
 
+/**
+ * How far harmony may rotate the palette, and how fast it may move.
+ *
+ * A fraction of the wheel, not all of it: the readers' own colours have to stay ordered by
+ * frequency, so a chord change shifts the whole picture's identity while low still reads
+ * differently from high. Smoothed as a vector rather than an angle — averaging angles
+ * across the wrap from 1 back to 0 yields the opposite colour, which would show up as the
+ * palette flipping to its complement for a moment on every pass through the top.
+ */
+const CHROMA_SPAN = 0.45;
+const CHROMA_TAU = 0.6;
+
+/**
+ * How far the stereo image may move a reader sideways.
+ *
+ * An offset on top of the sustain axis rather than a replacement for it. Both want the
+ * horizontal, and sustain is the more informative of the two most of the time — but a
+ * sound genuinely in the left speaker appearing on the left needs no explaining at all,
+ * so it is worth the share of the axis it takes.
+ *
+ * Sized against how music is actually mixed rather than against the -1..1 the measurement
+ * can return. Across the three test tracks half of all readings fall inside 0.05 and only
+ * the top percent pass 0.75, so a spread that made typical content obvious would fling the
+ * rare hard-panned sound off the edge. At this width a hard-panned band crosses a quarter
+ * of the frame, ordinary width drifts gently, and a mono track stays exactly centred —
+ * which is correct for it, not a failure to show anything.
+ */
+const PAN_SPREAD = 0.3;
+
 const BINS = 32;
 /** Width of a reader's view of the curve, in bins. See sampleCurve. */
 const READ_WIDTH = 1.6;
@@ -78,6 +107,7 @@ export function createField(config, rng) {
   const now = new Float32Array(BINS);
   const before = new Float32Array(BINS);
   const rise = new Float32Array(BINS);
+  const pan = new Float32Array(BINS);
 
   /**
    * One reader per position on the frequency axis. They hold only what has to persist
@@ -89,6 +119,7 @@ export function createField(config, rng) {
     readers.push({
       i,
       position: (i + 0.5) / count,
+      pan: 0,
       change: 0,
       mean: 0,
       spikiness: 0,
@@ -103,12 +134,19 @@ export function createField(config, rng) {
   let emitAccumulator = 0;
   let T = 0;
   let lastTransients = { radiusBoost: 0, bloomFlash: 0 };
+  let chromaX = 0;
+  let chromaY = 0;
+  let hueShift = 0;
 
   function reset() {
     emitAccumulator = 0;
     T = 0;
     lastTransients = { radiusBoost: 0, bloomFlash: 0 };
+    chromaX = 0;
+    chromaY = 0;
+    hueShift = 0;
     for (const r of readers) {
+      r.pan = 0;
       r.change = 0;
       r.mean = 0;
       r.spikiness = 0;
@@ -125,6 +163,7 @@ export function createField(config, rng) {
 
     timeline.spectrumAt(f.t, now);
     timeline.spectrumAt(Math.max(0, f.t - RISE_DELTA), before);
+    timeline.panAt(f.t, pan);
     // Scaled by what this track calls a strong rise, so a hard transient reads as about 1
     // on any material and the force constants below mean the same thing everywhere.
     const scale = 1 / Math.max(1e-3, timeline.riseReference ?? 1);
@@ -133,6 +172,19 @@ export function createField(config, rng) {
       rise[b] = Math.max(0, now[b] - before[b]) * scale;
       total += rise[b];
     }
+
+    /**
+     * Where the harmony points, and how clearly. The vector's length is confidence, so an
+     * atonal or percussive passage barely moves the colour while a held chord commits to
+     * one — which is what stops a drum break from strobing through the palette.
+     */
+    const targetX = timeline.chromaX ? timeline.sampleAt('chromaX', f.t) : 0;
+    const targetY = timeline.chromaY ? timeline.sampleAt('chromaY', f.t) : 0;
+    const k = 1 - Math.exp(-dt / CHROMA_TAU);
+    chromaX += (targetX - chromaX) * k;
+    chromaY += (targetY - chromaY) * k;
+    const clarity = clamp01(Math.hypot(chromaX, chromaY) * 2.2);
+    hueShift = ((Math.atan2(chromaY, chromaX) / (2 * Math.PI) + 1) % 1) * CHROMA_SPAN * clarity;
 
     const aspect = sim.canvas.width / sim.canvas.height;
     let radiusBoost = 0;
@@ -216,9 +268,19 @@ export function createField(config, rng) {
       const noise = clamp01(broad / Math.max(1e-4, amount));
 
       const shape = shapeOf(p, noise, reader.sustain);
+
+      /**
+       * Which side of the room this frequency is coming from, smoothed.
+       *
+       * Unsmoothed it jitters: pan is a ratio, and where a band is momentarily quiet its
+       * numerator and denominator are both near zero, so the reader would twitch across
+       * the frame between hits on a sound that never moved.
+       */
+      reader.pan += (sampleCurve(pan, p, READ_WIDTH) - reader.pan) * 0.08;
+
       // A slow wander, so a fixed set of positions never reads as a fixed set of points.
       const wobble = 0.035 * Math.sin(T * reader.wanderRate + reader.wanderPhase);
-      reader.x = clamp(shape.x + wobble, 0.03, 0.97);
+      reader.x = clamp(shape.x + reader.pan * PAN_SPREAD + wobble, 0.03, 0.97);
       reader.y = clamp(shape.y + wobble * 0.4, 0.03, 0.97);
 
       const drive = floor + amount * (0.4 + 0.6 * arc.intensity);
@@ -230,7 +292,7 @@ export function createField(config, rng) {
       // rendered as a soft round blob sitting in the frame doing nothing.
       const dye = (0.008 + 0.55 * clamp01(drive)) * (0.4 + 0.9 * arc.intensity) * dyeScale;
 
-      palette.colorAt(p, dye, color, arc.hueOffset);
+      palette.colorAt(p, dye, color, arc.hueOffset + hueShift);
 
       for (let k = 0; k < n; k++) {
         const a = ((k + 0.5) / n) * Math.PI * 2 + shape.scatter * (rng() - 0.5) * Math.PI * 2;
@@ -267,7 +329,7 @@ export function createField(config, rng) {
     if ((arc.liveness ?? 1) < 0.5) return;
     const drift = Math.sin(T * 0.23) * 0.06;
     const amount = (1 - total / 0.15) * dyeScale;
-    palette.colorAt(0.5, 0.012 * amount, color, arc.hueOffset);
+    palette.colorAt(0.5, 0.012 * amount, color, arc.hueOffset + hueShift);
     sim.splat(0.38 + drift, 0.5 - drift * 0.5, 28 * amount, 9 * amount, color);
     sim.splat(0.62 - drift, 0.5 + drift * 0.5, -28 * amount, -9 * amount, color);
   }

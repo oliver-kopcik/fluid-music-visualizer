@@ -15,7 +15,10 @@ import {
   FFT_SIZE,
   FRAME_RATE,
   BAND_NAMES,
-  SPECTRUM_BINS
+  SPECTRUM_BINS,
+  accumulateChroma,
+  chromaVector,
+  createPanAnalysis
 } from './spectra.js';
 import { normalizeRobust, scaleByP95, percentile } from './normalize.js';
 import { detectOnsets, mergeOnsets, DEFAULT_PARAMS } from './onsets.js';
@@ -41,9 +44,9 @@ import { spectralFlatness, onsetPitches, onsetDecays, rankNormalize } from './ti
 const SPARSE_TREBLE_DB = 8;
 
 self.onmessage = async (e) => {
-  const { samples, sampleRate, name } = e.data;
+  const { samples, side, sampleRate, name } = e.data;
   try {
-    const timeline = analyze(new Float32Array(samples), sampleRate, name, (progress) => {
+    const timeline = analyze(new Float32Array(samples), side ? new Float32Array(side) : null, sampleRate, name, (progress) => {
       self.postMessage({ type: 'progress', progress });
     });
     self.postMessage({ type: 'done', timeline }, transfersOf(timeline));
@@ -60,8 +63,9 @@ function transfersOf(timeline) {
   return out;
 }
 
-function analyze(samples, sampleRate, name, onProgress) {
+function analyze(samples, side, sampleRate, name, onProgress) {
   const spec = createSpectrogram(samples, sampleRate);
+  const panner = createPanAnalysis(side, spec.specEdges);
   const n = spec.numFrames;
 
   const raw = {};
@@ -75,6 +79,24 @@ function analyze(samples, sampleRate, name, onProgress) {
   const fluxLow = new Float32Array(n);
   const fluxHigh = new Float32Array(n);
   const spectrum32 = new Float32Array(n * SPECTRUM_BINS);
+  const spectrumFrame = new Float32Array(SPECTRUM_BINS);
+  /**
+   * Harmony, as a direction on the colour wheel rather than an angle — see chromaVector.
+   * Two curves instead of twelve: the mapping only needs where the harmony points and how
+   * clearly, and storing all twelve classes would cost six times as much for a detail
+   * nothing downstream reads.
+   */
+  const chromaX = new Float32Array(n);
+  const chromaY = new Float32Array(n);
+  /**
+   * Stereo position per display bin, stored as signed bytes. A position on screen does not
+   * need more than a couple hundred steps, and floats would cost four times as much for a
+   * curve that is already the second largest thing in the timeline.
+   */
+  const pan = panner ? new Int8Array(n * SPECTRUM_BINS) : null;
+  const panFrame = new Float32Array(SPECTRUM_BINS);
+  const chroma12 = new Float32Array(12);
+  const chromaOut = { x: 0, y: 0 };
 
   const half = FFT_SIZE / 2;
   const prevLog = new Float32Array(half + 1);
@@ -94,6 +116,11 @@ function analyze(samples, sampleRate, name, onProgress) {
 
     for (const band of BAND_NAMES) raw[band][f] = bandEnergyDb(mag, spec.bandBins[band]);
 
+    const chromaTotal = accumulateChroma(mag, sampleRate, FFT_SIZE, chroma12);
+    chromaVector(chroma12, chromaTotal, chromaOut);
+    chromaX[f] = chromaOut.x;
+    chromaY[f] = chromaOut.y;
+
     const r = spec.rmsAt(f);
     rms[f] = r;
     rmsDb[f] = 20 * Math.log10(r + 1e-9);
@@ -109,11 +136,14 @@ function analyze(samples, sampleRate, name, onProgress) {
     fluxHigh[f] = partialFlux(curLog, prevLog, highRange);
     prevLog.set(curLog);
 
-    const base = f * SPECTRUM_BINS;
-    for (let b = 0; b < SPECTRUM_BINS; b++) {
-      let sum = 0;
-      for (let k = spec.specEdges[b]; k < spec.specEdges[b + 1]; k++) sum += mag[k] * mag[k];
-      spectrum32[base + b] = Math.sqrt(sum);
+    // Each display bin is read from whichever analysis can resolve it — see spectra.js.
+    spec.spectrumInto(f, spectrumFrame);
+    spectrum32.set(spectrumFrame, f * SPECTRUM_BINS);
+
+    if (panner) {
+      panner.panInto(f, spec.output, panFrame);
+      const base = f * SPECTRUM_BINS;
+      for (let b = 0; b < SPECTRUM_BINS; b++) pan[base + b] = Math.round(panFrame[b] * 127);
     }
 
     if ((f & 511) === 0) onProgress(f / n);
@@ -373,6 +403,9 @@ function analyze(samples, sampleRate, name, onProgress) {
     sustain,
     spectrum32,
     spectrumReference,
+    chromaX,
+    chromaY,
+    pan,
     riseReference,
     beats: tempo.beats,
     downbeats: tempo.downbeats,

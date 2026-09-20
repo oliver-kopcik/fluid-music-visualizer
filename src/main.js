@@ -84,7 +84,7 @@ const picker = createTrackPicker(document.body, {
     setStatus('Analysing…');
 
     const result = await analyzeTrack(
-      { mono: decoded.mono, name, sampleRate: ANALYSIS_SAMPLE_RATE },
+      { mono: decoded.mono, side: decoded.side, name, sampleRate: ANALYSIS_SAMPLE_RATE },
       (p) => setStatus(`Analysing… ${Math.round(p * 100)}%`)
     );
 

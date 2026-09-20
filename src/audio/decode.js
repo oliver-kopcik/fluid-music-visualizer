@@ -11,6 +11,17 @@
 export const ANALYSIS_SAMPLE_RATE = 48000;
 
 /**
+ * The side channel is analysed at a quarter rate, which is not a compromise.
+ *
+ * 512 points at 12 kHz spans the same 42.7ms as 2048 at 48 kHz and lands on exactly the
+ * same 23.4375 Hz bin spacing, so side bin k lines up with mid bin k with no interpolation
+ * and no phase error. It covers up to 6 kHz; above that a stereo image is barely
+ * localisable anyway, and the saving is four times the memory on a signal we only need in
+ * order to ask which side of the room a sound came from.
+ */
+export const PAN_SAMPLE_RATE = ANALYSIS_SAMPLE_RATE / 4;
+
+/**
  * Rates to decode at, in order of preference.
  *
  * decodeAudioData always resamples to its context's rate, and a bare `new AudioContext()`
@@ -80,7 +91,38 @@ export async function decodeForAnalysis(file, onNotice = () => {}) {
   }
 
   const mono = await downmixAndResample(buffer);
-  return { buffer, mono, name: file.name ?? 'audio' };
+  const side = await renderSide(buffer);
+  return { buffer, mono, side, name: file.name ?? 'audio' };
+}
+
+/**
+ * (L - R)/2, the part of the signal that is not common to both speakers.
+ *
+ * Rendered straight to its own rate rather than by decimating a stereo copy, so a long
+ * track never needs both full channels in memory at once. Null for mono sources, where
+ * there is no stereo image to read and every splat would sit dead centre anyway.
+ */
+async function renderSide(buffer) {
+  if (buffer.numberOfChannels < 2) return null;
+  const frames = Math.ceil(buffer.duration * PAN_SAMPLE_RATE);
+  const offline = new OfflineAudioContext(1, frames, PAN_SAMPLE_RATE);
+  const source = offline.createBufferSource();
+  source.buffer = buffer;
+
+  const splitter = offline.createChannelSplitter(2);
+  const left = offline.createGain();
+  const right = offline.createGain();
+  left.gain.value = 0.5;
+  right.gain.value = -0.5;
+
+  source.connect(splitter);
+  splitter.connect(left, 0);
+  splitter.connect(right, 1);
+  left.connect(offline.destination);
+  right.connect(offline.destination);
+  source.start();
+
+  return (await offline.startRendering()).getChannelData(0);
 }
 
 async function fileToArrayBuffer(file) {

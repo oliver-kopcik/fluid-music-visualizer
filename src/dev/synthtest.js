@@ -324,6 +324,42 @@ export async function synthTest({ verbose = true } = {}) {
     );
   }
 
+  /**
+   * ---- 2d. spectrum: no part of the frequency axis may be dead -----------------------
+   *
+   * The display bins are log-spaced, so down at 40Hz they are 8Hz wide while a 2048-point
+   * window resolves 23.4Hz. Three of them therefore rounded onto the same FFT bin, spanned
+   * zero bins and read exactly 0.000 in every frame of every track ever analysed — the
+   * bottom of the range, where the kick lives, was drawn from nothing at all. Nothing
+   * downstream could have noticed: a silent band and a dead band look identical.
+   */
+  {
+    const sig = synth.fourOnFloor({ bpm: 120, bars: 8 });
+    const tl = await analyse(sig.mono, 'synth-spectrum');
+
+    const peak = [];
+    for (let b = 0; b < 32; b++) {
+      let mx = 0;
+      for (let f = 0; f < tl.numFrames; f++) mx = Math.max(mx, tl.spectrum32[f * 32 + b]);
+      peak.push(mx);
+    }
+    const dead = peak.map((v, b) => (v <= 0 ? b : -1)).filter((b) => b >= 0);
+    check('spectrum: every bin carries signal', dead.length === 0, dead.length ? `dead bins ${dead.join(',')}` : 'all 32 live');
+
+    /**
+     * A kick at 45Hz has to register in the bins that cover 45Hz. Asserting the energy is
+     * *there* rather than merely non-zero, since a bin fed by the wrong analysis would
+     * still pass the check above.
+     */
+    const lowPeak = Math.max(peak[0], peak[1], peak[2]);
+    const midPeak = Math.max(...peak.slice(14, 22));
+    check(
+      'spectrum: a 45Hz kick registers at the bottom of the range',
+      lowPeak > midPeak,
+      `bottom ${lowPeak.toFixed(2)} vs mid ${midPeak.toFixed(2)}`
+    );
+  }
+
   // ---- 3. sweep: the centroid should track a known curve ------------------------------
   {
     const mono = synth.sineSweep(12, 200, 5000);

@@ -6,10 +6,10 @@ import { Timeline } from './timeline.js';
 import { hashString } from '../util/rng.js';
 import { cacheGet, cachePut } from '../util/idb.js';
 
-export async function analyzeTrack({ mono, name, sampleRate }, onProgress = () => {}) {
+export async function analyzeTrack({ mono, side = null, name, sampleRate }, onProgress = () => {}) {
   // Key on content, not filename: renaming a file shouldn't invalidate it, and two copies
   // of the same track shouldn't be analysed twice.
-  const key = 'v23:' + contentKey(mono, name);
+  const key = 'v26:' + contentKey(mono, name);
 
   const cached = await cacheGet(key);
   if (cached) {
@@ -17,7 +17,7 @@ export async function analyzeTrack({ mono, name, sampleRate }, onProgress = () =
     return { timeline: new Timeline(cached), seed: hashString(key), cached: true };
   }
 
-  const timeline = await runWorker(mono, sampleRate, name, onProgress);
+  const timeline = await runWorker(mono, side, sampleRate, name, onProgress);
   await cachePut(key, timeline);
   return { timeline: new Timeline(timeline), seed: hashString(key), cached: false };
 }
@@ -33,7 +33,7 @@ function contentKey(mono, name) {
   return `${name}:${mono.length}:${(h >>> 0).toString(16)}`;
 }
 
-function runWorker(mono, sampleRate, name, onProgress) {
+function runWorker(mono, side, sampleRate, name, onProgress) {
   return new Promise((resolve, reject) => {
     const worker = new Worker(new URL('./analyze.worker.js', import.meta.url), { type: 'module' });
 
@@ -58,6 +58,8 @@ function runWorker(mono, sampleRate, name, onProgress) {
     // Copy: the caller still needs `mono` for nothing, but the AudioBuffer it came from
     // may be reused, and a detached view is a confusing failure to debug.
     const copy = mono.slice();
-    worker.postMessage({ samples: copy.buffer, sampleRate, name }, [copy.buffer]);
+    const sideCopy = side ? side.slice() : null;
+    const transfer = sideCopy ? [copy.buffer, sideCopy.buffer] : [copy.buffer];
+    worker.postMessage({ samples: copy.buffer, side: sideCopy?.buffer ?? null, sampleRate, name }, transfer);
   });
 }

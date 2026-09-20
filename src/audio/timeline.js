@@ -52,6 +52,25 @@ export class Timeline {
     return out;
   }
 
+  /**
+   * Where each frequency sits between the speakers at `t`, -1 left to +1 right.
+   *
+   * Stored as signed bytes, so this is the one place that scaling lives. Returns all zeros
+   * for a mono source, which places everything centrally — correct rather than a fallback,
+   * since a mono track genuinely has no stereo image.
+   */
+  panAt(t, out) {
+    const bins = 32;
+    if (!this.pan) {
+      out.fill(0);
+      return out;
+    }
+    const i = Math.min(this.numFrames - 1, Math.max(0, Math.round(t * this.frameRate)));
+    const base = i * bins;
+    for (let b = 0; b < bins; b++) out[b] = this.pan[base + b] / 127;
+    return out;
+  }
+
   /** Reset the walk — call on seek, and before frame 0 of a render. */
   /** Position within the current beat, 0..1, or NaN when the grid isn't trustworthy. */
   beatPhaseAt(t) {
