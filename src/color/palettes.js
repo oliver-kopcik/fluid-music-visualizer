@@ -122,6 +122,37 @@ export function createPalette(name, rng = Math.random) {
   };
 }
 
+/**
+ * A palette that cross-fades between two others.
+ *
+ * Section boundaries change the colour identity, and snapping would read as a glitch
+ * rather than a transition. Blending the two LUT lookups is cheap and, because both were
+ * built through OKLCH, the midpoint stays vivid instead of passing through grey.
+ */
+export function createBlendedPalette(fromName, toName, rng = Math.random) {
+  const a = createPalette(fromName, rng);
+  const b = createPalette(toName, rng);
+  const tmp = { r: 0, g: 0, b: 0 };
+  let mix = 0;
+  return {
+    get name() {
+      return mix < 0.5 ? a.name : b.name;
+    },
+    setMix(t) {
+      mix = t < 0 ? 0 : t > 1 ? 1 : t;
+    },
+    colorAt(position, intensity, out = {}, hueOffset = 0) {
+      a.colorAt(position, intensity, out, hueOffset);
+      if (mix <= 0) return out;
+      b.colorAt(position, intensity, tmp, hueOffset);
+      out.r += (tmp.r - out.r) * mix;
+      out.g += (tmp.g - out.g) * mix;
+      out.b += (tmp.b - out.b) * mix;
+      return out;
+    }
+  };
+}
+
 function hsvToRgb(h, s, v) {
   const i = Math.floor(h * 6);
   const f = h * 6 - i;

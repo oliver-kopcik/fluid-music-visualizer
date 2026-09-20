@@ -22,7 +22,7 @@ const LOOKAHEAD_SECONDS = 5;
 const NOVELTY_HALF_WINDOW = 2.5;
 
 export function analyzeSections(timelineFields, frameRate) {
-  const { rms, bass, mid, treble, centroidNorm } = timelineFields;
+  const { rms, bass, mid, treble, centroidNorm, sustain, flux, onsetTimes } = timelineFields;
   const n = rms.length;
 
   const energy = smooth(rms, Math.round(0.7 * frameRate));
@@ -30,7 +30,13 @@ export function analyzeSections(timelineFields, frameRate) {
 
   const novelty = noveltyCurve([bass, mid, treble, energy], n, frameRate);
   const boundaries = pickBoundaries(novelty, n, frameRate);
-  const sections = describeSections(boundaries, energy, centroidNorm, n, frameRate);
+  const sections = describeSections(
+    boundaries,
+    { energy, centroidNorm, bass, treble, sustain, flux },
+    onsetTimes,
+    n,
+    frameRate
+  );
 
   const sectionIndex = new Int32Array(n);
   const sectionEnergy = new Float32Array(n);
@@ -41,12 +47,25 @@ export function analyzeSections(timelineFields, frameRate) {
     }
   }
 
+  // Per-section character, for choosing an atmosphere. Packed as parallel arrays so the
+  // whole timeline stays transferable to the main thread in one go.
+  const pack = (key) => Float32Array.from(sections, (s) => s[key]);
+
   return {
     sectionBounds: Float32Array.from(boundaries, (f) => f / frameRate),
     sectionIndex,
     sectionEnergy,
     sectionCount: sections.length,
     sectionKinds: Uint8Array.from(sectionIndex, (i) => KIND_IDS[sections[i]?.kind ?? 'mid']),
+    sectionStats: {
+      energy: pack('energy'),
+      centroid: pack('centroid'),
+      brightness: pack('brightness'),
+      weight: pack('weight'),
+      sustain: pack('sustain'),
+      busyness: pack('busyness'),
+      onsetRate: pack('onsetRate')
+    },
     tension: tensionCurve(energy, frameRate),
     imminence: imminenceCurve(energy, energyLong, frameRate),
     release: releaseCurve(energy, frameRate),
@@ -143,27 +162,54 @@ function pickBoundaries(novelty, n, frameRate) {
   return peaks;
 }
 
-function describeSections(boundaries, energy, centroidNorm, n, frameRate) {
+function describeSections(boundaries, fields, onsetTimes, n, frameRate) {
+  const { energy, centroidNorm, bass, treble, sustain, flux } = fields;
   const sections = [];
   const levels = [];
 
   for (let i = 0; i < boundaries.length - 1; i++) {
     const startFrame = boundaries[i];
     const endFrame = boundaries[i + 1];
+    const count = Math.max(1, endFrame - startFrame);
+
     let e = 0;
     let c = 0;
+    let b = 0;
+    let tr = 0;
+    let su = 0;
+    let fl = 0;
     for (let f = startFrame; f < endFrame; f++) {
       e += energy[f];
       c += centroidNorm[f];
+      b += bass[f];
+      tr += treble[f];
+      su += sustain[f];
+      fl += flux[f];
     }
-    const count = Math.max(1, endFrame - startFrame);
+
+    const start = startFrame / frameRate;
+    const end = endFrame / frameRate;
+    let onsets = 0;
+    if (onsetTimes) {
+      for (let k = 0; k < onsetTimes.length; k++) {
+        if (onsetTimes[k] >= start && onsetTimes[k] < end) onsets++;
+      }
+    }
+
     sections.push({
       startFrame,
       endFrame,
-      start: startFrame / frameRate,
-      end: endFrame / frameRate,
+      start,
+      end,
       energy: e / count,
-      centroid: c / count
+      centroid: c / count,
+      // Treble against bass: how airy the section is versus how heavy.
+      brightness: tr / count,
+      weight: b / count,
+      // Held versus struck. High sustain with few onsets is a pad; the inverse is a beat.
+      sustain: su / count,
+      busyness: fl / count,
+      onsetRate: onsets / Math.max(0.5, end - start)
     });
     levels.push(e / count);
   }

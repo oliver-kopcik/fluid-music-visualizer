@@ -22,7 +22,7 @@ const base = {
   feel: {
     ranges: { curlMin: 18, curlMax: 48, radiusMin: 0.18, radiusMax: 0.34, densityQuiet: 7.5, densityLoud: 5.0, bloomBase: 0.5 }
   },
-  color: { palette: 'spectral' },
+  color: { palette: 'auto' },
   sim: { DYE_RESOLUTION: 1024, SIM_RESOLUTION: 128, COLORFUL: false, SHADING: true, BLOOM: true, SUNRAYS: true }
 };
 
@@ -43,7 +43,7 @@ export const PRESETS = {
     flow: { force: 240, curtain: true },
     hits: { force: 2600 },
     feel: { ranges: { curlMax: 52, densityLoud: 4.5, bloomBase: 0.5 } },
-    color: { palette: 'neon' }
+    color: { palette: 'auto' }
   }),
 
   // Nothing percussive to compete with, so hits are gentler and the sustained terms do
@@ -52,20 +52,20 @@ export const PRESETS = {
     flow: { force: 260, steer: 1.2, sustainDrive: 1.0, curtain: false },
     hits: { force: 1400 },
     feel: { ranges: { curlMin: 14, curlMax: 38, densityQuiet: 8.5, densityLoud: 6.0, bloomBase: 0.4 } },
-    color: { palette: 'ice' }
+    color: { palette: 'auto' }
   }),
 
   ambient: merge('ambient', 'Ambient / slow', {
     flow: { force: 150, steer: 0.7, sustainDrive: 1.2, curtain: false },
     hits: { force: 1000 },
     feel: { ranges: { curlMin: 10, curlMax: 28, densityQuiet: 9.0, densityLoud: 7.0, bloomBase: 0.35 } },
-    color: { palette: 'sunset' }
+    color: { palette: 'auto' }
   }),
 
   pop: merge('pop', 'Pop / mixed', {
     flow: { force: 210 },
     hits: { force: 2200 },
-    color: { palette: 'spectral' }
+    color: { palette: 'auto' }
   })
 };
 

@@ -14,16 +14,27 @@ import { createArc } from './arc.js';
 import { createFlow } from './flow.js';
 import { createHits } from './hits.js';
 import { createFeel } from './feel.js';
-import { createPalette } from '../color/palettes.js';
+import { createPalette, createBlendedPalette } from '../color/palettes.js';
+import { assignAtmospheres, ATMOSPHERES } from './atmospheres.js';
 
 export function createMapping({ timeline, preset, rng }) {
   const reader = createFeatureReader();
   const system = createEmitterSystem(preset.flow?.emitters ?? 6, rng);
-  const arc = createArc();
+
+  // Each section is matched to the atmosphere whose character fits its measurements.
+  const atmosphereIndex = assignAtmospheres(timeline.sectionStats ?? {}, timeline.sectionCount ?? 0);
+  const arc = createArc(atmosphereIndex);
   const flow = createFlow(preset.flow ?? {}, rng, system);
   const hits = createHits(preset.hits ?? {}, rng, system);
   const feel = createFeel(preset.feel ?? {});
-  let palette = createPalette(preset.color?.palette ?? 'spectral', rng);
+  // The atmosphere owns colour identity; an explicit preset palette overrides it, and
+  // 'random' keeps upstream's behaviour.
+  const fixedPalette = preset.color?.palette && preset.color.palette !== 'auto'
+    ? createPalette(preset.color.palette, rng)
+    : null;
+  let blended = createBlendedPalette('spectral', 'spectral', rng);
+  let paletteFrom = null;
+  let paletteTo = null;
 
   let tPrev = 0;
   let lastTransients = { radiusBoost: 0, bloomFlash: 0 };
@@ -68,10 +79,14 @@ export function createMapping({ timeline, preset, rng }) {
     emitters: system.emitters,
 
     get paletteName() {
-      return palette.name;
+      return fixedPalette ? fixedPalette.name : blended.name;
     },
+    get atmosphereName() {
+      return arc.state.atmosphereName;
+    },
+    /** Pass 'auto' to hand colour back to the atmospheres. */
     setPalette(name) {
-      palette = createPalette(name, rng);
+      preset.color = { ...preset.color, palette: name };
     },
 
     get syncOffset() {
@@ -111,6 +126,19 @@ export function createMapping({ timeline, preset, rng }) {
       tPrev = tRead;
 
       const a = arc.update(readArc(tRead), dt);
+
+      // Rebuild the cross-fade only when the atmosphere pair actually changes; setMix is
+      // the per-frame part and is free.
+      let palette = fixedPalette;
+      if (!palette) {
+        if (a.atmosphere.from !== paletteFrom || a.atmosphere.to !== paletteTo) {
+          paletteFrom = a.atmosphere.from;
+          paletteTo = a.atmosphere.to;
+          blended = createBlendedPalette(paletteFrom, paletteTo, rng);
+        }
+        blended.setMix(a.atmosphere.mix);
+        palette = blended;
+      }
 
       feel.apply(sim, f, dt, lastTransients, a);
       lastTransients = hits.apply(sim, f, dt, palette, timeline, a);

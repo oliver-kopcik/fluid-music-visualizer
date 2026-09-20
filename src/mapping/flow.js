@@ -96,7 +96,11 @@ export function createFlow(config, rng, system) {
       const rx = (dx * cs - dy * sn) / len;
       const ry = (dx * sn + dy * cs) / len;
 
-      const mag = force * Math.pow(clamp(drive, 0, 2), 1.3) * (0.6 + 1.1 * arc.intensity);
+      const mag =
+        force *
+        (arc.atmosphere?.flowForce ?? 1) *
+        Math.pow(clamp(drive, 0, 2), 1.3) *
+        (0.6 + 1.1 * arc.intensity);
 
       // Held deliberately low: six emitters at 60Hz is ~360 splats/sec, so each has to be
       // far fainter than a mouse splat or the screen fills within a couple of seconds.

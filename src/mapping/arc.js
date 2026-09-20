@@ -12,10 +12,14 @@
  */
 import { OnePole, Envelope, clamp01, lerp } from './smoothers.js';
 import { blendFormations } from './emitters.js';
+import { blendAtmospheres, ATMOSPHERE_NAMES } from './atmospheres.js';
 
 export const POSTURES = ['drift', 'ring', 'coil', 'burst'];
 
-export function createArc() {
+/** Seconds to cross-fade from one section's atmosphere into the next. */
+const ATMOSPHERE_FADE = 2.2;
+
+export function createArc(atmosphereIndex) {
   // Postures cross-fade rather than switch, or every boundary would be a visual glitch.
   const wDrift = new OnePole(0.7, 0.25);
   const wRing = new OnePole(0.7, 0.75);
@@ -27,6 +31,17 @@ export function createArc() {
 
   const weights = { drift: 0, ring: 0, coil: 0, burst: 0 };
   const formation = {};
+  const atmosphere = {};
+
+  let prevAtmos = nameFor(0);
+  let curAtmos = nameFor(0);
+  let fade = 1;
+
+  function nameFor(sectionIdx) {
+    if (!atmosphereIndex || !atmosphereIndex.length) return 'aurora';
+    const i = Math.min(atmosphereIndex.length - 1, Math.max(0, sectionIdx));
+    return ATMOSPHERE_NAMES[atmosphereIndex[i]] ?? 'aurora';
+  }
 
   const state = {
     posture: 'ring',
@@ -42,7 +57,10 @@ export function createArc() {
     hueOffset: 0,
     sectionIndex: -1,
     sectionKind: 'mid',
-    justChangedSection: false
+    justChangedSection: false,
+    /** Blended simulation character for this moment. See atmospheres.js. */
+    atmosphere,
+    atmosphereName: 'aurora'
   };
 
   let lastSection = -1;
@@ -56,6 +74,9 @@ export function createArc() {
     sectionHue.reset(0.5);
     lastSection = -1;
     state.sectionIndex = -1;
+    prevAtmos = nameFor(0);
+    curAtmos = nameFor(0);
+    fade = 1;
   }
 
   /**
@@ -69,10 +90,22 @@ export function createArc() {
 
     state.justChangedSection = sectionIndex !== lastSection;
     if (state.justChangedSection) {
+      const next = nameFor(sectionIndex);
+      if (next !== curAtmos) {
+        // Carry the *currently rendered* blend forward as the new starting point, so a
+        // boundary arriving mid-fade doesn't snap back to the previous section's look.
+        prevAtmos = fade < 1 ? prevAtmos : curAtmos;
+        curAtmos = next;
+        fade = 0;
+      }
       lastSection = sectionIndex;
       state.sectionIndex = sectionIndex;
       state.sectionKind = kind;
     }
+
+    fade = Math.min(1, fade + dt / ATMOSPHERE_FADE);
+    blendAtmospheres(prevAtmos, curAtmos, fade, atmosphere);
+    state.atmosphereName = atmosphere.label;
 
     // Coil is the anticipation term: imminence dominates, tension supports it. This is
     // what makes the picture tighten *before* the drop rather than after.

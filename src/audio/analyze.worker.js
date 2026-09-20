@@ -202,12 +202,21 @@ function analyze(samples, sampleRate, name, onProgress) {
 
   // Structure: where the sections are, and what is about to happen.
   const structure = analyzeSections(
-    { rms: rmsNorm, bass: bands.bass, mid: bands.mid, treble: bands.treble, centroidNorm },
+    {
+      rms: rmsNorm,
+      bass: bands.bass,
+      mid: bands.mid,
+      treble: bands.treble,
+      centroidNorm,
+      sustain,
+      flux: fluxNorm,
+      onsetTimes: Float32Array.from(onsets, (o) => o.t)
+    },
     FRAME_RATE
   );
 
   return {
-    version: 9,
+    version: 10,
     ...structure,
     name,
     frameRate: FRAME_RATE,
