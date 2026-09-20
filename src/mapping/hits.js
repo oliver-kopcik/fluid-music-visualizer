@@ -16,6 +16,7 @@ const MAX_SPLATS_PER_FRAME = 16;
 
 export function createHits(config, rng, system) {
   const color = { r: 0, g: 0, b: 0 };
+  let dyeScale = 1;
   // Reused scratch, so a busy passage does not allocate an array per frame.
   const ordered = [];
   let sinceOnset = 999;
@@ -37,6 +38,8 @@ export function createHits(config, rng, system) {
 
     // Quiet sections get gentler hits, so the loud ones have somewhere to go.
     const gain = 0.35 + 0.75 * arc.intensity;
+    // Abrupt atmospheres clear dye fast, so a hit has to land harder to read at all.
+    dyeScale = arc.atmosphere?.dye ?? 1;
 
     const aspect = sim.canvas.width / sim.canvas.height;
     const baseForce = config.force ?? (f.profile === 'sparse' ? 1400 : 2400);
@@ -88,7 +91,7 @@ export function createHits(config, rng, system) {
 
     const n = 5;
     const r = 0.05;
-    palette.colorAt(clamp01(f.centroid * 0.6), (0.3 + 0.3 * s) * (0.5 + 0.7 * arc.intensity), color, arc.hueOffset);
+    palette.colorAt(clamp01(f.centroid * 0.6), (0.3 + 0.3 * s) * (0.5 + 0.7 * arc.intensity) * dyeScale, color, arc.hueOffset);
     for (let i = 0; i < n; i++) {
       const a = (2 * Math.PI * i) / n + rng() * 0.4;
       const speed = force * (0.8 + 0.4 * rng());
@@ -115,7 +118,7 @@ export function createHits(config, rng, system) {
     const y = 0.62;
     // Deliberately far around the palette from the flow: hits should read as their own
     // colour punching in, not as a brighter version of what is already there.
-    palette.colorAt(clamp01(0.55 + f.centroid * 0.45), (0.22 + 0.26 * s) * (0.5 + 0.7 * arc.intensity), color, arc.hueOffset + 0.4);
+    palette.colorAt(clamp01(0.55 + f.centroid * 0.45), (0.22 + 0.26 * s) * (0.5 + 0.7 * arc.intensity) * dyeScale, color, arc.hueOffset + 0.4);
     sim.splat(clamp(0.5 - spread, 0.02, 0.98), y, force * 1.1, 0, color);
     sim.splat(clamp(0.5 + spread, 0.02, 0.98), y, -force * 1.1, 0, color);
     return 2;
@@ -125,14 +128,14 @@ export function createHits(config, rng, system) {
     const x = clamp(0.2 + f.centroid * 0.6, 0.05, 0.95);
     const y = clamp(0.3 + f.rms * 0.4, 0.05, 0.95);
     const a = rng() * 2 * Math.PI;
-    palette.colorAt(f.centroid, (0.18 + 0.25 * s) * (0.5 + 0.7 * arc.intensity), color, arc.hueOffset + 0.4);
+    palette.colorAt(f.centroid, (0.18 + 0.25 * s) * (0.5 + 0.7 * arc.intensity) * dyeScale, color, arc.hueOffset + 0.4);
     sim.splat(x, y, Math.cos(a) * force * 0.8, Math.sin(a) * aspect * force * 0.8, color);
     return 1;
   }
 
   function downbeat(sim, f, s, force, aspect, palette, arc) {
     const n = 8;
-    palette.colorAt(clamp01(f.centroid), (0.28 + 0.26 * s) * (0.5 + 0.7 * arc.intensity), color, arc.hueOffset + 0.2);
+    palette.colorAt(clamp01(f.centroid), (0.28 + 0.26 * s) * (0.5 + 0.7 * arc.intensity) * dyeScale, color, arc.hueOffset + 0.2);
     for (let i = 0; i < n; i++) {
       const a = (2 * Math.PI * i) / n;
       sim.splat(

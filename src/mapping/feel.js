@@ -27,7 +27,7 @@ import { OnePole, Envelope, lerp, clamp, clamp01 } from './smoothers.js';
 const LIMITS = {
   CURL: [4, 90],
   SPLAT_RADIUS: [0.05, 0.9],
-  DENSITY_DISSIPATION: [0.5, 14],
+  DENSITY_DISSIPATION: [0.5, 30],
   VELOCITY_DISSIPATION: [0.01, 1.6],
   PRESSURE: [0.3, 0.99],
   BLOOM_INTENSITY: [0.1, 1.6],

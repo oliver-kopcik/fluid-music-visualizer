@@ -38,6 +38,9 @@ export function createFlow(config, rng, system) {
     const bands = f.profile === 'sparse' ? BANDS_SPARSE : BANDS_FULL;
     const force = config.force ?? 220;
     const gate = config.gate ?? 0.06;
+    // Higher-dissipation atmospheres deposit more, or they would simply be darker rather
+    // than more abrupt. See the `dye` note in atmospheres.js.
+    const dyeScale = arc.atmosphere?.dye ?? 1;
 
     const swirl = 2.5 + 9 * arc.coil + 5 * arc.burst;
 
@@ -50,11 +53,11 @@ export function createFlow(config, rng, system) {
      */
     for (let r = 0; r < rounds; r++) {
       system.step(arc.formation, aspect, REFERENCE_DT, swirl);
-      emitRound(sim, f, palette, arc, aspect, bands, force, gate);
+      emitRound(sim, f, palette, arc, aspect, bands, force, gate, dyeScale);
     }
   }
 
-  function emitRound(sim, f, palette, arc, aspect, bands, force, gate) {
+  function emitRound(sim, f, palette, arc, aspect, bands, force, gate, dyeScale) {
 
     /**
      * Dynamic range lives here. In a quiet section arc.intensity falls to ~0.2, most
@@ -104,14 +107,14 @@ export function createFlow(config, rng, system) {
 
       // Held deliberately low: six emitters at 60Hz is ~360 splats/sec, so each has to be
       // far fainter than a mouse splat or the screen fills within a couple of seconds.
-      const dye = (0.012 + 0.05 * Math.pow(clamp01(drive), 0.8)) * (0.4 + 0.9 * arc.intensity);
+      const dye = (0.012 + 0.05 * Math.pow(clamp01(drive), 0.8)) * (0.4 + 0.9 * arc.intensity) * dyeScale;
       palette.colorAt(clamp01(f.centroid + i * 0.03), dye, color, arc.hueOffset);
 
       sim.splat(e.x, e.y, rx * mag, ry * mag, color);
     }
 
-    if (config.curtain) applyCurtain(sim, f, 1, palette, aspect, arc);
-    applyIdleBed(sim, f, 1, palette, arc, system.time);
+    if (config.curtain) applyCurtain(sim, f, dyeScale, palette, aspect, arc);
+    applyIdleBed(sim, f, dyeScale, palette, arc, system.time);
   }
 
   /**

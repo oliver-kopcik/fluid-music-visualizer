@@ -22,7 +22,17 @@
  *                     streamers. High = motion dies on contact, staccato and crisp.
  * @property curl      CURL. Vorticity — how much the flow curls into itself.
  * @property pressure  PRESSURE. High = smooth and coherent, low = loose and turbulent.
- * @property density   DENSITY_DISSIPATION. Trail length.
+ * @property density   DENSITY_DISSIPATION. Trail length — and the main control over how
+ *                     abrupt the picture is. High values mean dye vanishes almost as fast
+ *                     as it lands, so each hit reads as a snap rather than a smear.
+ * @property dye       Multiplier on how much dye every layer deposits.
+ *
+ *                     This has to rise with `density`, because steady-state brightness is
+ *                     roughly injection over dissipation: raising dissipation alone just
+ *                     produces a dark screen. Raising it *less* than proportionally is
+ *                     what gives the abrupt look — a bright transient against a bed that
+ *                     has already faded. Swept live at 100s of the EDM track: 12/x1.8 is
+ *                     muddy, 18/x3 snaps, 26/x5 is gone before you register it.
  * @property radius    SPLAT_RADIUS base.
  * @property bloom     BLOOM_INTENSITY base.
  * @property sunrays   SUNRAYS_WEIGHT.
@@ -36,7 +46,8 @@ export const ATMOSPHERES = {
     velocity: 0.06,
     curl: 14,
     pressure: 0.92,
-    density: 4.5,
+    density: 7.5,
+    dye: 1.35,
     radius: 0.42,
     bloom: 0.45,
     sunrays: 0.4,
@@ -51,7 +62,8 @@ export const ATMOSPHERES = {
     velocity: 0.04,
     curl: 10,
     pressure: 0.96,
-    density: 6.0,
+    density: 8.5,
+    dye: 1.3,
     radius: 0.3,
     bloom: 0.5,
     sunrays: 1.3,
@@ -66,7 +78,8 @@ export const ATMOSPHERES = {
     velocity: 0.08,
     curl: 30,
     pressure: 0.88,
-    density: 7.0,
+    density: 12,
+    dye: 1.9,
     radius: 0.2,
     bloom: 0.7,
     sunrays: 1.5,
@@ -81,7 +94,8 @@ export const ATMOSPHERES = {
     velocity: 0.55,
     curl: 58,
     pressure: 0.6,
-    density: 9.0,
+    density: 20,
+    dye: 3.1,
     radius: 0.16,
     bloom: 0.55,
     sunrays: 0.7,
@@ -96,7 +110,8 @@ export const ATMOSPHERES = {
     velocity: 0.22,
     curl: 46,
     pressure: 0.7,
-    density: 5.0,
+    density: 10.5,
+    dye: 2.0,
     radius: 0.36,
     bloom: 0.85,
     sunrays: 1.1,
@@ -111,7 +126,8 @@ export const ATMOSPHERES = {
     velocity: 0.03,
     curl: 8,
     pressure: 0.95,
-    density: 8.5,
+    density: 11,
+    dye: 1.45,
     radius: 0.26,
     bloom: 0.35,
     sunrays: 0.9,
@@ -124,7 +140,7 @@ export const ATMOSPHERES = {
 export const ATMOSPHERE_NAMES = Object.keys(ATMOSPHERES);
 
 /** Keys blended numerically. Palette is picked, not blended, then cross-faded separately. */
-const NUMERIC_KEYS = ['velocity', 'curl', 'pressure', 'density', 'radius', 'bloom', 'sunrays', 'flowForce'];
+const NUMERIC_KEYS = ['velocity', 'curl', 'pressure', 'density', 'radius', 'bloom', 'sunrays', 'flowForce', 'dye'];
 
 /**
  * Pick the atmosphere whose wanted character best matches a section.

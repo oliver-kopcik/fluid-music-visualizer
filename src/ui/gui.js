@@ -26,7 +26,7 @@ export function createSimGUI(sim, { onScreenshot, getMapping } = {}) {
    * doing. Ranges are widened to match what FEEL can actually produce — upstream's
    * vorticity slider stops at 50 and the mapping legitimately goes past it.
    */
-  gui.add(sim.config, 'DENSITY_DISSIPATION', 0, 14).name('density diffusion').listen();
+  gui.add(sim.config, 'DENSITY_DISSIPATION', 0, 30).name('density diffusion').listen();
   gui.add(sim.config, 'VELOCITY_DISSIPATION', 0, 1.6).name('velocity diffusion').listen();
   gui.add(sim.config, 'PRESSURE', 0.3, 1).name('pressure').listen();
   gui.add(sim.config, 'CURL', 0, 90).step(1).name('vorticity').listen();

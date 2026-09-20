@@ -15,12 +15,30 @@ npm run dev          # http://localhost:5173
 |---|---|
 | M0 · Vite scaffold, upstream vendored | done |
 | M1 · Modularized fluid core, lil-gui | done |
-| M2 · Seeded RNG + determinism harness | in progress |
-| M3 · Audio analysis worker + timeline | |
-| M4 · Playback + FLOW/HITS/FEEL mapping | |
+| M2 · Seeded RNG + determinism harness | done |
+| M3 · Audio analysis worker + timeline | done |
+| M4 · Playback + FLOW/HITS/FEEL mapping | done |
+| M4b · Arc, atmospheres, test suites | done |
 | M5 · Quick WebM export | |
 | M6 · Deterministic MP4 export | |
 | M7 · UI polish | |
+
+## Tests
+
+Both run in the browser console against the dev server:
+
+```js
+await window.synthTest()   // 30 assertions vs synthesised audio with known ground truth
+await window.selfTest()    // end-to-end over the tracks in music/
+await window.checkDeterminism()
+```
+
+`synthTest` is the stronger of the two. Real tracks can only be judged; the synthetic
+signals have exact answers — kick k lands at exactly k·60/bpm, the sweep's centroid is a
+known function of time, the arrangement changes section at 8, 16, 32 and 40 seconds. It
+found four real bugs, including onsets reported 33ms early and every snare being drawn as
+a kick. It also validates its own fixtures first, having been misled by a "hi-hat"
+filtered at 306Hz.
 
 ## Audio
 
