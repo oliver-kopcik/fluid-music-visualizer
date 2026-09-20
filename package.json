@@ -1,0 +1,23 @@
+{
+  "name": "fluid-music-visualizer",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Music visualizer built on PavelDoGreat's WebGL fluid simulation",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test:determinism": "node scripts/determinism.mjs",
+    "verify:core": "node scripts/verify-core.mjs"
+  },
+  "dependencies": {
+    "fft.js": "^4.0.4",
+    "lil-gui": "^0.20.0",
+    "mp4-muxer": "^5.1.5",
+    "webm-muxer": "^5.0.3"
+  },
+  "devDependencies": {
+    "vite": "^6.0.7"
+  }
+}
