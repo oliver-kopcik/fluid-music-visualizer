@@ -1,0 +1,25 @@
+node_modules/
+dist/
+dist-ssr/
+.vite/
+*.local
+
+# Local audio — never commit copyrighted material
+music/
+exports/
+*.mp3
+*.wav
+*.flac
+*.m4a
+*.ogg
+*.opus
+*.mp4
+*.webm
+
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+scripts/.shader-callsites.txt
+scripts/.shader-imports.txt
