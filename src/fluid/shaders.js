@@ -23,7 +23,8 @@ SOFTWARE.
 */
 
 // GLSL sources lifted verbatim from vendor/script.js by scripts/extract-shaders.mjs.
-// Not hand-edited: new shaders go at the bottom of this file, existing ones stay as upstream wrote them.
+// Not hand-edited: new shaders go at the bottom of this file. Deliberate changes to an
+// upstream shader live in the PATCHES list in that script, never here.
 
 export const baseVertexShaderSource = `
     precision highp float;
@@ -486,12 +487,12 @@ export const displayShaderSource = `
     #endif
 
     #ifdef BLOOM
-        float noise = texture2D(uDithering, vUv * ditherScale).r;
-        noise = noise * 2.0 - 1.0;
-        bloom += noise / 255.0;
         bloom = linearToGamma(bloom);
         c += bloom;
     #endif
+
+        float noise = texture2D(uDithering, vUv * ditherScale).r;
+        c += (noise * 2.0 - 1.0) / 255.0;
 
         float a = max(c.r, max(c.g, c.b));
         gl_FragColor = vec4(c, a);

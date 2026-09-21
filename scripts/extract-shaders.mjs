@@ -32,6 +32,52 @@ for (const m of block.matchAll(bare)) {
   shaders.push({ name: m[1], glType: null, source: m[2], extraArgs: '', compiled: false });
 }
 
+/**
+ * Deliberate departures from upstream's GLSL, applied after extraction.
+ *
+ * Kept here rather than by hand-editing src/fluid/shaders.js so the file stays
+ * regenerable, and so every difference from upstream is written down in one place — the
+ * same reason scripts/build-core.mjs carries its ops list.
+ */
+const PATCHES = [
+  {
+    shader: 'displayShaderSource',
+    note:
+      'dither the final image, not just the bloom term. Upstream applies its ordered '
+      + 'dither inside #ifdef BLOOM, so with bloom off nothing is dithered at all and the '
+      + 'large smooth dark gradients this draws quantise straight to 8 bits. The banding '
+      + 'that produces is what a video encoder then spends its bitrate describing, and it '
+      + 'is far more visible than the noise. Needs the matching uniform binding in '
+      + 'scripts/build-core.mjs, since upstream only binds uDithering when bloom is on.',
+    find: `    #ifdef BLOOM
+        float noise = texture2D(uDithering, vUv * ditherScale).r;
+        noise = noise * 2.0 - 1.0;
+        bloom += noise / 255.0;
+        bloom = linearToGamma(bloom);
+        c += bloom;
+    #endif
+`,
+    replace: `    #ifdef BLOOM
+        bloom = linearToGamma(bloom);
+        c += bloom;
+    #endif
+
+        float noise = texture2D(uDithering, vUv * ditherScale).r;
+        c += (noise * 2.0 - 1.0) / 255.0;
+`
+  }
+];
+
+for (const patch of PATCHES) {
+  const target = shaders.find((s) => `${s.name}Source` === patch.shader || s.name === patch.shader);
+  if (!target) throw new Error(`patch target ${patch.shader} not found`);
+  if (!target.source.includes(patch.find)) {
+    throw new Error(`patch for ${patch.shader} no longer matches upstream; re-check it by hand`);
+  }
+  target.source = target.source.replace(patch.find, patch.replace);
+  console.log(`patched ${patch.shader}: ${patch.note.slice(0, 60)}...`);
+}
+
 // A `${` in a source would silently become an interpolation when re-emitted.
 for (const s of shaders) {
   if (s.source.includes('${') || s.source.includes('`')) {
@@ -46,7 +92,8 @@ const out = [
   header,
   '',
   '// GLSL sources lifted verbatim from vendor/script.js by scripts/extract-shaders.mjs.',
-  '// Not hand-edited: new shaders go at the bottom of this file, existing ones stay as upstream wrote them.',
+  '// Not hand-edited: new shaders go at the bottom of this file. Deliberate changes to an',
+  '// upstream shader live in the PATCHES list in that script, never here.',
   '',
   ...shaders.map((s) => {
     const exportName = s.compiled ? `${s.name}Source` : s.name;

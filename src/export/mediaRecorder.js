@@ -30,7 +30,7 @@ export function canQuickRecord() {
  * @param player  the audio player, so the recording carries the track rather than
  *                whatever the microphone hears.
  */
-export function startQuickRecord({ canvas, player, fps = 60, videoBitrate = 12_000_000 }) {
+export function startQuickRecord({ canvas, player, fps = 60, videoBitrate = 24_000_000 }) {
   if (!canQuickRecord()) throw new Error('This browser cannot record the canvas.');
 
   const stream = canvas.captureStream(fps);

@@ -46,9 +46,9 @@ export function createExportPanel(container, { canvas, player, getState }) {
           </label>
           <label>quality
             <select class="ep-bitrate">
-              <option value="10000000">10 Mbps</option>
-              <option value="20000000" selected>20 Mbps</option>
-              <option value="40000000">40 Mbps</option>
+              <option value="20000000">20 Mbps</option>
+              <option value="40000000" selected>40 Mbps</option>
+              <option value="80000000">80 Mbps</option>
             </select>
           </label>
           <label>range

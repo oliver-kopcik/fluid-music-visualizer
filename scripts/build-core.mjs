@@ -134,6 +134,22 @@ const ops = [
     ]
   },
   {
+    from: 1339,
+    to: 1344,
+    note:
+      'bind the dithering texture whether or not bloom is on. Upstream only ever dithers the '
+      + 'bloom term, so with BLOOM off there is no dither anywhere and the smooth dark '
+      + 'gradients this draws quantise straight to 8-bit and band. See the matching shader '
+      + 'patch in scripts/extract-shaders.mjs',
+    replace: [
+      '    if (config.BLOOM)',
+      '        gl.uniform1i(displayMaterial.uniforms.uBloom, bloom.attach(1));',
+      '    gl.uniform1i(displayMaterial.uniforms.uDithering, ditheringTexture.attach(2));',
+      '    let ditherTexScale = getTextureScale(ditheringTexture, width, height);',
+      '    gl.uniform2f(displayMaterial.uniforms.ditherScale, ditherTexScale.x, ditherTexScale.y);'
+    ]
+  },
+  {
     from: 1441,
     to: 1441,
     note: 'instrumentation hook: lets the determinism harness see every splat, including the '

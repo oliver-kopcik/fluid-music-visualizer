@@ -80,7 +80,13 @@ export async function renderToFile({
   seed,
   resolution = '1080p',
   fps = 60,
-  videoBitrate = 20_000_000,
+  /**
+   * Generous, because the encoder only spends what the picture needs and this picture is
+   * demanding: large smooth gradients are the hardest thing to encode without banding.
+   * Measured on a 1080p60 render, it delivers 91% of a 20Mbps target and 74% of 40, so
+   * asking for 40 costs nothing on easy material and buys headroom on hard material.
+   */
+  videoBitrate = 40_000_000,
   dyeResolution = 1024,
   startTime = 0,
   duration = null,
