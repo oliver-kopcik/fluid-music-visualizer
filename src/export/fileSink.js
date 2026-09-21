@@ -14,8 +14,36 @@ import { ArrayBufferTarget, FileSystemWritableFileStreamTarget } from 'mp4-muxer
 export const canStreamToDisk = () => typeof window.showSaveFilePicker === 'function';
 
 /** Rough output size, for warning before a render that cannot stream. */
-export function estimateBytes({ seconds, videoBitrate, audioBitrate = 192000 }) {
-  return ((videoBitrate + audioBitrate) / 8) * seconds;
+/**
+ * Roughly what a quality target costs per second, measured on this material at 1080p60.
+ *
+ * Constant quality means the size is not known in advance, but this only feeds the warning
+ * shown before a render that cannot stream to disk, so an approximation from real numbers
+ * beats a bitrate that no longer describes anything. Measured busy-to-quiet spans at each
+ * point; the higher figure is used so the warning errs toward caution.
+ */
+const QUALITY_BITRATE = [
+  [6, 45_000_000],
+  [10, 30_000_000],
+  [14, 18_000_000],
+  [18, 10_000_000]
+];
+
+export function bitrateForQuality(quantizer) {
+  const points = QUALITY_BITRATE;
+  if (quantizer <= points[0][0]) return points[0][1];
+  if (quantizer >= points[points.length - 1][0]) return points[points.length - 1][1];
+  for (let i = 1; i < points.length; i++) {
+    const [q0, b0] = points[i - 1];
+    const [q1, b1] = points[i];
+    if (quantizer <= q1) return b0 + ((b1 - b0) * (quantizer - q0)) / (q1 - q0);
+  }
+  return points[points.length - 1][1];
+}
+
+export function estimateBytes({ seconds, videoBitrate, quantizer = null, audioBitrate = 192000 }) {
+  const video = quantizer != null ? bitrateForQuality(quantizer) : videoBitrate;
+  return ((video + audioBitrate) / 8) * seconds;
 }
 
 /**

@@ -46,9 +46,9 @@ export function createExportPanel(container, { canvas, player, getState }) {
           </label>
           <label>quality
             <select class="ep-bitrate">
-              <option value="20000000">20 Mbps</option>
-              <option value="40000000" selected>40 Mbps</option>
-              <option value="80000000">80 Mbps</option>
+              <option value="16">high</option>
+              <option value="10" selected>very high</option>
+              <option value="6">maximum</option>
             </select>
           </label>
           <label>range
@@ -129,7 +129,7 @@ export function createExportPanel(container, { canvas, player, getState }) {
         seed: state.seed,
         resolution: $('.ep-res').value,
         fps: Number($('.ep-fps').value),
-        videoBitrate: Number($('.ep-bitrate').value),
+        quantizer: Number($('.ep-bitrate').value),
         startTime,
         duration,
         filename: `${safeName(state.trackName)}.mp4`,

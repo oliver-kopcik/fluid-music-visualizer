@@ -81,10 +81,14 @@ export async function renderToFile({
   resolution = '1080p',
   fps = 60,
   /**
-   * Generous, because the encoder only spends what the picture needs and this picture is
-   * demanding: large smooth gradients are the hardest thing to encode without banding.
-   * Measured on a 1080p60 render, it delivers 91% of a 20Mbps target and 74% of 40, so
-   * asking for 40 costs nothing on easy material and buys headroom on hard material.
+   * How good every frame must look, on the AVC 0-51 scale where lower is better. This is
+   * the real quality control — see the note on constant quality in webcodecsEncoder.js.
+   */
+  quantizer = 10,
+  /**
+   * Only a fallback, for browsers without quantizer support, and the basis of the
+   * out-of-memory estimate below. Deliberately generous: a bitrate target holds its
+   * average by taking quality away from exactly the passages that needed it.
    */
   videoBitrate = 40_000_000,
   dyeResolution = 1024,
@@ -105,11 +109,11 @@ export async function renderToFile({
   const totalFrames = Math.round(seconds * fps);
 
   if (!canStreamToDisk() && deliver) {
-    const mb = estimateBytes({ seconds, videoBitrate }) / 1e6;
+    const mb = estimateBytes({ seconds, videoBitrate, quantizer }) / 1e6;
     if (mb > 400) {
       throw new Error(
         `This browser cannot stream to disk, so the whole ${Math.round(mb)} MB file must be held ` +
-          `in memory. Shorten the render, lower the bitrate, or use a browser with the File ` +
+          `in memory. Shorten the render, lower the quality, or use a browser with the File ` +
           `System Access API.`
       );
     }
@@ -128,6 +132,7 @@ export async function renderToFile({
       height,
       fps,
       videoBitrate,
+      quantizer,
       audioBuffer,
       sink,
       onError: (e) => {
