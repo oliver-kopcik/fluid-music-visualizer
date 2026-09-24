@@ -16,6 +16,16 @@ npm run dev     # http://localhost:5173
 Drag an audio file onto the window. Nothing is uploaded anywhere; decoding and analysis
 happen in your browser.
 
+![A frame from the visualizer: a bright ochre plume rising through deep ember reds against black](docs/example-3.webp)
+
+<p align="center">
+  <img src="docs/example-1.webp" width="49%" alt="Pale blue and scarlet dye folded through dark space, with gold plumes to the right" />
+  <img src="docs/example-2.webp" width="49%" alt="A deep crimson swirl filling the frame, edged with olive at the right" />
+</p>
+
+<p align="center"><em>Three frames from one track. Every still is a real render — nothing was posed or
+retouched. The audio is not included; see <a href="#credit">Credit</a>.</em></p>
+
 ---
 
 ## What you are looking at

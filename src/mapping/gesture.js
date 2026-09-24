@@ -27,23 +27,20 @@ import { clamp01 } from './smoothers.js';
  * sitting on top of each other however differently they behaved. A second real axis solves
  * the diagonal properly and separates them.
  *
- * Sustain is curved before it is used as a position. Measured sustain is physical and so
- * genuinely lopsided — the median onset sits at 0.14 on the EDM track — which would crowd
- * most of a track into the left margin. This curve spreads that median to 0.45 while
- * leaving the order and both endpoints untouched.
+ * `sustain` is a position on that axis, already even — the caller is responsible for that,
+ * and the field passes each reader's rank among the others.
  *
- * A power curve does the same job and was the first choice, but its slope at zero is
- * infinite: two of the shortest sounds in a track, measured a thousandth apart, landed 7%
- * of the frame apart. Zero is exactly where measurement noise lives, so the mapping has to
- * be gentlest there, not steepest. This one has a finite slope everywhere.
+ * It used to be curved here. That was right when sustain was a raw measurement, which is
+ * physical and so genuinely lopsided, and the curve pulled its median off the left margin.
+ * Ranking the readers against each other later made the input uniform by construction, and
+ * the curve was left in — so it was compressing an already-even spread rather than opening
+ * out a bunched one. Eleven of twelve readers ended up right of x=0.37 and the left quarter
+ * of the frame became unreachable, which is plainly visible as a dead band in any still.
  */
-const SUSTAIN_KNEE = 0.25;
-const spreadSustain = (d) => (d * (1 + SUSTAIN_KNEE)) / (d + SUSTAIN_KNEE);
-
-export function shapeOf(pitch, noise = 0.5, decay = 0) {
+export function shapeOf(pitch, noise = 0.5, sustain = 0) {
   const p = clamp01(pitch);
   return {
-    x: 0.1 + 0.8 * spreadSustain(clamp01(decay)),
+    x: 0.1 + 0.8 * clamp01(sustain),
     y: 0.12 + 0.76 * p,
     // Low sounds are wide and heavy, high ones tight and light.
     spread: 0.085 - 0.055 * p,
