@@ -1,6 +1,13 @@
 MIT License
 
 Copyright (c) 2017 Pavel Dobryakov
+  — the WebGL fluid simulation and its GLSL shaders, from
+    https://github.com/PavelDoGreat/WebGL-Fluid-Simulation
+
+Copyright (c) 2026 Oliver Kopcik
+  — the audio analysis, mapping, export pipeline and application around it
+
+See NOTICE.md for which files are derived from which.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
