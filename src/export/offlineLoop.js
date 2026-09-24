@@ -84,7 +84,7 @@ export async function renderToFile({
    * How good every frame must look, on the AVC 0-51 scale where lower is better. This is
    * the real quality control — see the note on constant quality in webcodecsEncoder.js.
    */
-  quantizer = 10,
+  quantizer = 30,
   /**
    * Only a fallback, for browsers without quantizer support, and the basis of the
    * out-of-memory estimate below. Deliberately generous: a bitrate target holds its

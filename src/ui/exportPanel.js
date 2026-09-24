@@ -46,9 +46,9 @@ export function createExportPanel(container, { canvas, player, getState }) {
           </label>
           <label>quality
             <select class="ep-bitrate">
-              <option value="16">high</option>
-              <option value="10" selected>very high</option>
-              <option value="6">maximum</option>
+              <option value="36">high</option>
+              <option value="30" selected>very high</option>
+              <option value="24">maximum</option>
             </select>
           </label>
           <label>range

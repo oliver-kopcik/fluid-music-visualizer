@@ -135,8 +135,13 @@ passages that need it most: at a 40 Mbps target, four seconds of quiet intro cam
 is far harder to encode.
 
 The quality setting instead tells the encoder how good each frame must look and lets it
-spend what that costs. Expect roughly **165 MB per minute** at 1080p60 on the default;
-*high* roughly halves it.
+spend what that costs. Expect roughly **250 MB per minute** at 1080p60 on the default —
+this material is unusually expensive to encode, being full-frame moving detail with no
+static background anywhere. *high* cuts that to about 85 MB per minute.
+
+Measure these yourself as a *marginal* cost if you change anything: a render begins with an
+empty canvas, so its first seconds are nearly black and nearly free. Timing a short clip
+understates the steady-state rate by more than tenfold.
 
 ---
 

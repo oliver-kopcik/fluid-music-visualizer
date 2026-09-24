@@ -17,16 +17,21 @@ export const canStreamToDisk = () => typeof window.showSaveFilePicker === 'funct
 /**
  * Roughly what a quality target costs per second, measured on this material at 1080p60.
  *
- * Constant quality means the size is not known in advance, but this only feeds the warning
- * shown before a render that cannot stream to disk, so an approximation from real numbers
- * beats a bitrate that no longer describes anything. Measured busy-to-quiet spans at each
- * point; the higher figure is used so the warning errs toward caution.
+ * Constant quality means the size is not known in advance, but this feeds the warning shown
+ * before a render that cannot stream to disk, so an approximation from real numbers beats a
+ * bitrate that no longer describes anything.
+ *
+ * Measured as a *marginal* cost — the difference between a 24-second and a 12-second render
+ * from the same point — because a render starts with an empty canvas and its first seconds
+ * are nearly black and nearly free. Timing short clips instead, which is what an earlier
+ * version of this table did, understated the real cost by more than an order of magnitude
+ * and put the default at about 126 Mbps while claiming 22.
  */
 const QUALITY_BITRATE = [
-  [6, 45_000_000],
-  [10, 30_000_000],
-  [14, 18_000_000],
-  [18, 10_000_000]
+  [22, 120_000_000],
+  [28, 44_000_000],
+  [34, 16_300_000],
+  [40, 6_300_000]
 ];
 
 export function bitrateForQuality(quantizer) {
